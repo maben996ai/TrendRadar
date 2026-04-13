@@ -10,12 +10,22 @@ from app.schemas.schemas import SettingsResponse, SettingsUpdate
 router = APIRouter()
 
 
+async def get_or_create_user_settings(db: AsyncSession, user_id: str) -> UserSettings:
+    settings = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
+    if settings is None:
+        settings = UserSettings(user_id=user_id)
+        db.add(settings)
+        await db.commit()
+        await db.refresh(settings)
+    return settings
+
+
 @router.get("/feishu", response_model=SettingsResponse)
 async def get_feishu_settings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> UserSettings:
-    settings = await db.scalar(select(UserSettings).where(UserSettings.user_id == current_user.id))
+    settings = await get_or_create_user_settings(db, current_user.id)
     return settings
 
 
@@ -25,7 +35,7 @@ async def update_feishu_settings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> UserSettings:
-    settings = await db.scalar(select(UserSettings).where(UserSettings.user_id == current_user.id))
+    settings = await get_or_create_user_settings(db, current_user.id)
     settings.feishu_webhook_url = payload.feishu_webhook_url
     await db.commit()
     await db.refresh(settings)

@@ -9,6 +9,11 @@ __pycache__/
 **/__pycache__/
 **/*.pyc
 .ruff_cache/
+.tmp-python/
+.run/
+backend/data/
+backend/*.db
+backend/*.db-journal
 
 # Node
 frontend/node_modules/

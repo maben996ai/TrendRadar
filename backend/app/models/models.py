@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint, func
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -14,6 +14,11 @@ class Base(DeclarativeBase):
 class Platform(StrEnum):
     BILIBILI = "bilibili"
     YOUTUBE = "youtube"
+
+
+class CrawlLogStatus(StrEnum):
+    SUCCESS = "success"
+    FAILED = "failed"
 
 
 def uuid_str() -> str:
@@ -51,6 +56,9 @@ class UserSettings(Base):
 
 class Creator(Base):
     __tablename__ = "creators"
+    __table_args__ = (
+        UniqueConstraint("user_id", "platform", "platform_creator_id", name="uq_creators_user_platform_creator"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True)
@@ -75,6 +83,9 @@ class Creator(Base):
 
 class Video(Base):
     __tablename__ = "videos"
+    __table_args__ = (
+        UniqueConstraint("creator_id", "platform_video_id", name="uq_videos_creator_platform_video"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
     creator_id: Mapped[str] = mapped_column(String(36), ForeignKey("creators.id"), index=True)
@@ -83,6 +94,7 @@ class Video(Base):
     thumbnail_url: Mapped[str | None] = mapped_column(Text(), nullable=True)
     video_url: Mapped[str] = mapped_column(Text())
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    raw_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     creator: Mapped[Creator] = relationship(back_populates="videos")
@@ -93,8 +105,9 @@ class CrawlLog(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
     creator_id: Mapped[str] = mapped_column(String(36), ForeignKey("creators.id"), index=True)
-    status: Mapped[str] = mapped_column(String(50), default="success")
-    message: Mapped[str] = mapped_column(Text(), default="Initialized placeholder crawl log")
+    status: Mapped[str] = mapped_column(String(50), default=CrawlLogStatus.SUCCESS)
+    message: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    videos_found: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     creator: Mapped[Creator] = relationship(back_populates="crawl_logs")

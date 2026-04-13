@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.models import Platform
+from app.models.models import CrawlLogStatus, Platform
 
 
 class UserCreate(BaseModel):
@@ -54,10 +54,14 @@ class VideoResponse(BaseModel):
 
     id: str
     creator_id: str
+    platform_video_id: str
     title: str
     thumbnail_url: str | None
     video_url: str
     published_at: datetime
+    creator_name: str
+    creator_avatar_url: str | None
+    platform: Platform
 
 
 class SettingsUpdate(BaseModel):
@@ -74,12 +78,18 @@ class SettingsResponse(BaseModel):
     updated_at: datetime
 
 
+class CrawlAcceptedResponse(BaseModel):
+    status: CrawlLogStatus
+    videos_found: int
+
+
 class CrawlLogResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
     creator_id: str
-    status: str
-    message: str
+    status: CrawlLogStatus
+    message: str | None
+    videos_found: int
     created_at: datetime
 
