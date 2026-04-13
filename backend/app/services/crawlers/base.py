@@ -1,22 +1,37 @@
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from app.models.models import Platform
 
 
 @dataclass
+class CreatorInfo:
+    platform_id: str
+    name: str
+    profile_url: str
+    avatar_url: str | None = None
+    raw_data: dict = field(default_factory=dict)
+
+
+@dataclass
 class CrawledVideo:
-    platform: Platform
     platform_video_id: str
     title: str
     video_url: str
     published_at: datetime
     thumbnail_url: str | None = None
+    raw_data: dict = field(default_factory=dict)
 
 
-class BaseCrawler:
+class BaseCrawler(ABC):
     platform: Platform
 
-    async def fetch_latest_videos(self, creator_id: str) -> list[CrawledVideo]:
+    @abstractmethod
+    async def resolve_creator(self, url: str) -> CreatorInfo:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def fetch_latest_videos(self, creator_id: str, limit: int = 20) -> list[CrawledVideo]:
         raise NotImplementedError
 
