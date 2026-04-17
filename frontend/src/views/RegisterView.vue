@@ -1,39 +1,39 @@
 <template>
   <section class="panel auth-panel">
-    <p class="eyebrow">New workspace</p>
-    <h2>Create your account</h2>
+    <p class="eyebrow">{{ t("auth.registerEyebrow") }}</p>
+    <h2>{{ t("auth.registerTitle") }}</h2>
 
     <form class="form" @submit.prevent="handleRegister">
       <div class="field">
-        <label for="display_name">Display name</label>
+        <label for="display_name">{{ t("auth.displayName") }}</label>
         <input
           id="display_name"
           v-model="displayName"
           type="text"
-          placeholder="Your name"
+          :placeholder="t('auth.displayNamePlaceholder')"
           autocomplete="name"
         />
       </div>
 
       <div class="field">
-        <label for="email">Email</label>
+        <label for="email">{{ t("auth.email") }}</label>
         <input
           id="email"
           v-model="email"
           type="email"
-          placeholder="you@example.com"
+          :placeholder="t('auth.emailPlaceholder')"
           autocomplete="email"
           required
         />
       </div>
 
       <div class="field">
-        <label for="password">Password</label>
+        <label for="password">{{ t("auth.password") }}</label>
         <input
           id="password"
           v-model="password"
           type="password"
-          placeholder="At least 8 characters"
+          :placeholder="t('auth.registerPasswordPlaceholder')"
           autocomplete="new-password"
           minlength="8"
           required
@@ -43,13 +43,13 @@
       <p v-if="errorMsg" class="error-msg">{{ errorMsg }}</p>
 
       <button class="btn" type="submit" :disabled="loading">
-        {{ loading ? "Creating account…" : "Create account" }}
+        {{ loading ? t("auth.creatingAccount") : t("auth.createAccount") }}
       </button>
     </form>
 
     <p class="auth-footer">
-      Already have an account?
-      <RouterLink to="/login">Sign in</RouterLink>
+      {{ t("auth.haveAccount") }}
+      <RouterLink to="/login">{{ t("auth.signInLink") }}</RouterLink>
     </p>
   </section>
 </template>
@@ -59,10 +59,12 @@ import { ref } from "vue";
 import { useRouter } from "vue-router";
 
 import { authApi } from "../api/auth";
+import { useI18n } from "../i18n";
 import { useAuthStore } from "../stores/auth";
 
 const router = useRouter();
 const authStore = useAuthStore();
+const { t } = useI18n();
 
 const displayName = ref("");
 const email = ref("");
@@ -84,7 +86,7 @@ async function handleRegister() {
     await authStore.fetchUser();
     router.push("/");
   } catch (err: any) {
-    errorMsg.value = err.response?.data?.detail ?? "Registration failed. Please try again.";
+    errorMsg.value = err.response?.data?.detail ?? t("auth.registerFailed");
   } finally {
     loading.value = false;
   }

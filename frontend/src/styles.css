@@ -29,6 +29,48 @@ a {
   min-height: 100vh;
 }
 
+.app-frame {
+  position: relative;
+  min-height: 100vh;
+}
+
+.locale-switcher {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 20;
+  display: inline-flex;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(8, 12, 18, 0.72);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.locale-option {
+  border: none;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: transparent;
+  color: rgba(245, 241, 232, 0.8);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.locale-option.active {
+  background: linear-gradient(135deg, #e77a45, #efb767);
+  color: #10161d;
+  font-weight: 700;
+}
+
+.locale-option:hover {
+  color: #f5f1e8;
+}
+
 .shell {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
@@ -270,5 +312,9 @@ a {
   .content {
     padding: 20px;
   }
-}
 
+  .locale-switcher {
+    top: 14px;
+    right: 14px;
+  }
+}

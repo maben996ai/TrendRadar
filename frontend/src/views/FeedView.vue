@@ -2,10 +2,10 @@
   <section class="stack">
     <div class="hero">
       <div>
-        <p class="eyebrow">Live Feed</p>
-        <h2>Track creators across Bilibili and YouTube in one timeline.</h2>
+        <p class="eyebrow">{{ t("feed.eyebrow") }}</p>
+        <h2>{{ t("feed.title") }}</h2>
       </div>
-      <span class="status-pill">Bootstrap state</span>
+      <span class="status-pill">{{ t("feed.status") }}</span>
     </div>
 
     <div class="grid">
@@ -19,22 +19,27 @@
 </template>
 
 <script setup lang="ts">
-const cards = [
-  {
-    platform: "Bilibili",
-    title: "Unified video feed",
-    description: "Video cards, timeline sorting and platform filtering will land here.",
-  },
-  {
-    platform: "YouTube",
-    title: "Notification-ready workflow",
-    description: "Feishu settings and crawl automation are scaffolded on the backend.",
-  },
-  {
-    platform: "System",
-    title: "Composable architecture",
-    description: "This page is wired through Vue Router and ready for API-backed stores.",
-  },
-];
-</script>
+import { computed } from "vue";
 
+import { useI18n } from "../i18n";
+
+const { t } = useI18n();
+
+const cards = computed(() => [
+  {
+    platform: t("feed.cards.bilibiliPlatform"),
+    title: t("feed.cards.bilibiliTitle"),
+    description: t("feed.cards.bilibiliDescription"),
+  },
+  {
+    platform: t("feed.cards.youtubePlatform"),
+    title: t("feed.cards.youtubeTitle"),
+    description: t("feed.cards.youtubeDescription"),
+  },
+  {
+    platform: t("feed.cards.systemPlatform"),
+    title: t("feed.cards.systemTitle"),
+    description: t("feed.cards.systemDescription"),
+  },
+]);
+</script>

@@ -1,4 +1,4 @@
-# CLAUDE.md
+# agent-guide.md
 
 本文件用于给 Claude Code / Codex 之类的代码代理提供仓库工作说明。
 
@@ -7,13 +7,14 @@
 FinFlow 是一个面向港美股投资者的金融信息聚合平台。当前一期目标是聚合 Bilibili 和 YouTube 财经博主的视频更新，在 Web 端统一展示，并支持飞书通知。
 
 当前仓库状态：
-- 前后端最小运行骨架已完成
-- 开发环境约定已建立
-- 业务功能仍在持续开发中
+- 后端核心能力已基本完成：鉴权、配置、采集器、解析器、调度器、主要 API 与测试均已落地
+- 前端已完成登录、注册、Token 持久化、导航守卫和基础布局
+- 创作者管理、真实视频流、设置页与抓取日志页仍主要处于占位或待联调状态
+- 当前前端还在开发中的额外改动包括中英文切换能力
 
 详细文档位于：
-- [.context/finflow-prd.md](.context/finflow-prd.md) - 产品需求文档
-- [.context/finflow-tdd.md](.context/finflow-tdd.md) - 技术设计文档
+- [finflow-prd.md](./finflow-prd.md) - 产品需求文档
+- [finflow-tdd.md](./finflow-tdd.md) - 技术设计文档
 
 ## 技术栈
 
@@ -131,16 +132,32 @@ ruff format .
 - 可复用组件放在 `src/components/`
 - 全局状态优先放在 `src/stores/`
 
+## 当前进展判断
+
+结合 `.context/finflow-tdd.md` 中的阶段划分，当前项目大致处于：
+
+- 第二阶段后端开发：基本完成
+- 第三阶段前端开发：已完成第 1-4 步，正在进入第 5-8 步
+- 第四阶段联调与验证：尚未完整跑通
+- 第五阶段生产部署：配置已具备基础能力，但未到最终收尾阶段
+
+更具体地说：
+
+1. 后端已完成 `core`、模型、鉴权、采集器、解析器、调度器、通知器和主要 API，且测试覆盖较完整。
+2. 前端已完成 `api/client.ts`、`stores/auth.ts`、`router/index.ts`、`LoginView.vue`、`RegisterView.vue`。
+3. `CreatorsView.vue`、`FeedView.vue`、`SettingsView.vue`、`CrawlLogsView.vue` 目前仍以展示或占位为主，还未形成完整业务闭环。
+4. 全链路验证文档中的“添加创作者即解析并触发抓取、信息流真实展示、飞书推送校验”等关键步骤，还没有在现状中完全体现。
+
 ## 开发优先级
 
 继续开发时，优先按下面顺序推进：
 
-1. 打通注册、登录与 token 持久化
-2. 实现 Creator 添加后的真实解析与入库
-3. 接入 Bilibili / YouTube 抓取逻辑
-4. 实现视频流展示与筛选
-5. 接入飞书通知
-6. 补齐 Alembic 迁移与测试
+1. 实现 Creator 添加后的真实解析与入库
+2. 打通视频流展示与筛选
+3. 接入设置页与抓取日志页的真实 API
+4. 完成飞书通知配置和联调验证
+5. 补齐前端页面级测试或最小验证脚本
+6. 完成第四阶段的端到端联调清单
 
 ## 代理注意事项
 

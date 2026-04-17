@@ -1,28 +1,28 @@
 <template>
   <section class="panel auth-panel">
-    <p class="eyebrow">Welcome back</p>
-    <h2>Sign in to FinFlow</h2>
+    <p class="eyebrow">{{ t("auth.loginEyebrow") }}</p>
+    <h2>{{ t("auth.loginTitle") }}</h2>
 
     <form class="form" @submit.prevent="handleLogin">
       <div class="field">
-        <label for="email">Email</label>
+        <label for="email">{{ t("auth.email") }}</label>
         <input
           id="email"
           v-model="email"
           type="email"
-          placeholder="you@example.com"
+          :placeholder="t('auth.emailPlaceholder')"
           autocomplete="email"
           required
         />
       </div>
 
       <div class="field">
-        <label for="password">Password</label>
+        <label for="password">{{ t("auth.password") }}</label>
         <input
           id="password"
           v-model="password"
           type="password"
-          placeholder="••••••••"
+          :placeholder="t('auth.passwordPlaceholder')"
           autocomplete="current-password"
           required
         />
@@ -31,13 +31,13 @@
       <p v-if="errorMsg" class="error-msg">{{ errorMsg }}</p>
 
       <button class="btn" type="submit" :disabled="loading">
-        {{ loading ? "Signing in…" : "Sign in" }}
+        {{ loading ? t("auth.signingIn") : t("auth.signIn") }}
       </button>
     </form>
 
     <p class="auth-footer">
-      Don't have an account?
-      <RouterLink to="/register">Create one</RouterLink>
+      {{ t("auth.noAccount") }}
+      <RouterLink to="/register">{{ t("auth.createOne") }}</RouterLink>
     </p>
   </section>
 </template>
@@ -47,10 +47,12 @@ import { ref } from "vue";
 import { useRouter } from "vue-router";
 
 import { authApi } from "../api/auth";
+import { useI18n } from "../i18n";
 import { useAuthStore } from "../stores/auth";
 
 const router = useRouter();
 const authStore = useAuthStore();
+const { t } = useI18n();
 
 const email = ref("");
 const password = ref("");
@@ -66,7 +68,7 @@ async function handleLogin() {
     await authStore.fetchUser();
     router.push("/");
   } catch (err: any) {
-    errorMsg.value = err.response?.data?.detail ?? "Login failed. Please try again.";
+    errorMsg.value = err.response?.data?.detail ?? t("auth.loginFailed");
   } finally {
     loading.value = false;
   }
