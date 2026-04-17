@@ -1,11 +1,13 @@
 <template>
   <section class="panel">
-    <p class="eyebrow">Crawl Logs</p>
-    <h2>Scheduler activity timeline</h2>
-    <p class="muted">Crawler execution history will be shown here after job wiring is added.</p>
+    <p class="eyebrow">{{ t("crawlLogs.eyebrow") }}</p>
+    <h2>{{ t("crawlLogs.title") }}</h2>
+    <p class="muted">{{ t("crawlLogs.description") }}</p>
   </section>
 </template>
 
 <script setup lang="ts">
-</script>
+import { useI18n } from "../i18n";
 
+const { t } = useI18n();
+</script>

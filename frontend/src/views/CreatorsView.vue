@@ -1,11 +1,13 @@
 <template>
   <section class="panel">
-    <p class="eyebrow">Creators</p>
-    <h2>Creator management scaffold</h2>
-    <p class="muted">Add, delete and annotate creator subscriptions here after API wiring.</p>
+    <p class="eyebrow">{{ t("creators.eyebrow") }}</p>
+    <h2>{{ t("creators.title") }}</h2>
+    <p class="muted">{{ t("creators.description") }}</p>
   </section>
 </template>
 
 <script setup lang="ts">
-</script>
+import { useI18n } from "../i18n";
 
+const { t } = useI18n();
+</script>
