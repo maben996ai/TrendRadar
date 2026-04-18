@@ -86,6 +86,27 @@ class SettingsResponse(BaseModel):
     updated_at: datetime
 
 
+class FeishuWebhookCreate(BaseModel):
+    name: str
+    webhook_url: str
+
+
+class FeishuWebhookUpdate(BaseModel):
+    name: str | None = None
+    enabled: bool | None = None
+
+
+class FeishuWebhookResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    user_id: str
+    name: str
+    webhook_url: str
+    enabled: bool
+    created_at: datetime
+
+
 class CrawlAcceptedResponse(BaseModel):
     status: CrawlLogStatus
     videos_found: int

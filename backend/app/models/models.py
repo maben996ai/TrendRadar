@@ -36,6 +36,7 @@ class User(Base):
 
     creators: Mapped[list["Creator"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     settings: Mapped["UserSettings | None"] = relationship(back_populates="user", cascade="all, delete-orphan")
+    feishu_webhooks: Mapped[list["FeishuWebhook"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class UserSettings(Base):
@@ -100,6 +101,19 @@ class Video(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     creator: Mapped[Creator] = relationship(back_populates="videos")
+
+
+class FeishuWebhook(Base):
+    __tablename__ = "feishu_webhooks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    webhook_url: Mapped[str] = mapped_column(Text())
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="feishu_webhooks")
 
 
 class CrawlLog(Base):
