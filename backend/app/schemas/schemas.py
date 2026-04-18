@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.models import CrawlLogStatus, Platform
+from app.models.models import ContentType, CrawlLogStatus, Platform
 
 
 class UserCreate(BaseModel):
@@ -33,12 +33,14 @@ class TokenResponse(BaseModel):
 class CreatorCreate(BaseModel):
     url: str
     note: str | None = None
+    content_type: ContentType = ContentType.VIDEO
 
 
 class CreatorUpdate(BaseModel):
     note: str | None = None
     category: str | None = None
     starred: bool | None = None
+    content_type: ContentType | None = None
 
 
 class CreatorResponse(BaseModel):
@@ -52,6 +54,7 @@ class CreatorResponse(BaseModel):
     avatar_url: str | None
     note: str | None
     category: str | None
+    content_type: ContentType
     starred: bool
     notifications_enabled: bool
     created_at: datetime
@@ -92,6 +95,27 @@ class VideoListResponse(BaseModel):
     has_more: bool
 
 
+class FeishuWebhookCreate(BaseModel):
+    name: str
+    webhook_url: str
+
+
+class FeishuWebhookUpdate(BaseModel):
+    name: str | None = None
+    enabled: bool | None = None
+
+
+class FeishuWebhookResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    user_id: str
+    name: str
+    webhook_url: str
+    enabled: bool
+    created_at: datetime
+
+
 class CrawlAcceptedResponse(BaseModel):
     status: CrawlLogStatus
     videos_found: int
@@ -106,4 +130,3 @@ class CrawlLogResponse(BaseModel):
     message: str | None
     videos_found: int
     created_at: datetime
-
