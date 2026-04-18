@@ -2,12 +2,13 @@ import { createRouter, createWebHistory } from "vue-router";
 
 import AppShell from "../components/layout/AppShell.vue";
 import { useAuthStore } from "../stores/auth";
-import CrawlLogsView from "../views/CrawlLogsView.vue";
+import AuthorFeedView from "../views/AuthorFeedView.vue";
+import ContentAnalysisView from "../views/ContentAnalysisView.vue";
+import ControlCenterView from "../views/ControlCenterView.vue";
 import CreatorsView from "../views/CreatorsView.vue";
 import FeedView from "../views/FeedView.vue";
 import LoginView from "../views/LoginView.vue";
 import RegisterView from "../views/RegisterView.vue";
-import SettingsView from "../views/SettingsView.vue";
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -19,9 +20,10 @@ export const router = createRouter({
       component: AppShell,
       children: [
         { path: "", name: "feed", component: FeedView },
+        { path: "author/:creatorId", name: "author-feed", component: AuthorFeedView },
         { path: "creators", name: "creators", component: CreatorsView },
-        { path: "settings", name: "settings", component: SettingsView },
-        { path: "crawl-logs", name: "crawl-logs", component: CrawlLogsView },
+        { path: "content-analysis", name: "content-analysis", component: ContentAnalysisView },
+        { path: "control-center", name: "control-center", component: ControlCenterView },
       ],
     },
   ],

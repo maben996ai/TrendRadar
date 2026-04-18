@@ -44,12 +44,27 @@ class BilibiliCrawler(BaseCrawler):
     platform = Platform.BILIBILI
 
     async def resolve_creator(self, url: str) -> CreatorInfo:
-        async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}, timeout=15) as client:
+        sessdata = settings.bilibili_sessdata
+        cookies = {"SESSDATA": sessdata} if sessdata else {}
+        async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}, cookies=cookies, timeout=15) as client:
+            spi = await client.get("https://api.bilibili.com/x/frontend/finger/spi")
+            spi_data = spi.json().get("data", {})
+            client.cookies.set("buvid3", spi_data.get("b_3", ""))
+            client.cookies.set("buvid4", spi_data.get("b_4", ""))
+
+            nav = await client.get("https://api.bilibili.com/x/web-interface/nav")
+            wbi_img = nav.json()["data"]["wbi_img"]
+            img_key = wbi_img["img_url"].split("/")[-1].split(".")[0]
+            sub_key = wbi_img["sub_url"].split("/")[-1].split(".")[0]
+            mixin_key = _get_mixin_key(img_key, sub_key)
+
             parsed = await self._normalize_url(url, client)
             uid = await self._extract_uid(parsed, client)
             if uid is None:
                 raise ValueError("Unsupported Bilibili creator URL")
-            response = await client.get("https://api.bilibili.com/x/space/acc/info", params={"mid": uid})
+
+            params = _wbi_sign({"mid": uid}, mixin_key)
+            response = await client.get("https://api.bilibili.com/x/space/wbi/acc/info", params=params)
             response.raise_for_status()
             payload = response.json()
 

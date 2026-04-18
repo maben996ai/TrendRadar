@@ -1,13 +1,27 @@
 <template>
   <section class="stack">
-    <!-- 头部 + 新增表单 -->
+    <!-- 头部 + tab -->
     <div class="hero">
       <div>
         <p class="eyebrow">{{ t("creators.eyebrow") }}</p>
         <h2>{{ t("creators.title") }}</h2>
       </div>
+      <div class="feed-filters">
+        <button class="filter-btn" :class="{ active: contentType === 'video' }" @click="contentType = 'video'">{{ t("creators.tabVideos") }}</button>
+        <button class="filter-btn" :class="{ active: contentType === 'article' }" @click="contentType = 'article'">{{ t("creators.tabArticles") }}</button>
+        <button class="filter-btn" :class="{ active: contentType === 'news' }" @click="contentType = 'news'">{{ t("creators.tabNews") }}</button>
+        <button class="filter-btn" :class="{ active: contentType === 'market' }" @click="contentType = 'market'">{{ t("creators.tabMarket") }}</button>
+      </div>
     </div>
 
+    <!-- 资讯/市场留白 -->
+    <template v-if="contentType === 'news' || contentType === 'market'">
+      <div class="panel feed-state">
+        <p class="muted">{{ t("creators.comingSoon") }}</p>
+      </div>
+    </template>
+
+    <template v-else>
     <div class="panel add-form">
       <form class="add-row" @submit.prevent="handleAdd">
         <input
@@ -58,6 +72,7 @@
         </div>
       </div>
     </div>
+    </template>
 
     <!-- 编辑弹层 -->
     <div v-if="editTarget" class="modal-backdrop" @click.self="editTarget = null">
@@ -91,6 +106,7 @@ import type { Creator } from "../types";
 
 const { t } = useI18n();
 
+const contentType = ref<"video" | "article" | "news" | "market">("video");
 const creators = ref<Creator[]>([]);
 const loading = ref(false);
 const fetchError = ref(false);

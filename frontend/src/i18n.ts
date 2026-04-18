@@ -14,11 +14,13 @@ const messages = {
     },
     nav: {
       product: "FinFlow",
-      title: "投资信号驾驶舱",
-      feed: "动态",
-      creators: "创作者",
+      title: "金融流",
+      feed: "动态资讯",
+      creators: "信源管理",
       settings: "设置",
       crawlLogs: "抓取日志",
+      controlCenter: "控制中心",
+      contentAnalysis: "内容分析",
       signOut: "退出登录",
     },
     feed: {
@@ -31,6 +33,13 @@ const messages = {
       fetchError: "加载失败，请稍后重试。",
       prevPage: "上一页",
       nextPage: "下一页",
+      tabVideos: "视频",
+      tabArticles: "文章",
+      tabNews: "资讯",
+      tabMarket: "市场",
+      viewAll: "查看全部",
+      comingSoon: "即将上线，敬请期待",
+      backToFeed: "← 返回动态",
     },
     creators: {
       eyebrow: "创作者",
@@ -48,6 +57,11 @@ const messages = {
       save: "保存",
       cancel: "取消",
       starred: "特别关注",
+      tabVideos: "视频",
+      tabArticles: "文章",
+      tabNews: "资讯",
+      tabMarket: "市场",
+      comingSoon: "该板块即将上线",
       platformBilibili: "Bilibili",
       platformYoutube: "YouTube",
     },
@@ -60,6 +74,11 @@ const messages = {
       eyebrow: "抓取日志",
       title: "调度执行时间线",
       description: "任务接线完成后，这里会展示爬虫执行历史。",
+    },
+    contentAnalysis: {
+      eyebrow: "内容分析",
+      title: "内容分析",
+      description: "基于大模型的视频内容分析与投研洞察，即将上线。",
     },
     auth: {
       loginEyebrow: "欢迎回来",
@@ -93,11 +112,13 @@ const messages = {
     },
     nav: {
       product: "FinFlow",
-      title: "Investor signal cockpit",
-      feed: "Feed",
-      creators: "Creators",
+      title: "金融流",
+      feed: "Latest Updates",
+      creators: "Sources",
       settings: "Settings",
       crawlLogs: "Crawl Logs",
+      controlCenter: "Control Center",
+      contentAnalysis: "Content Analysis",
       signOut: "Sign out",
     },
     feed: {
@@ -110,6 +131,13 @@ const messages = {
       fetchError: "Failed to load. Please try again.",
       prevPage: "Prev",
       nextPage: "Next",
+      tabVideos: "Videos",
+      tabArticles: "Articles",
+      tabNews: "News",
+      tabMarket: "Market",
+      viewAll: "View all",
+      comingSoon: "Coming soon",
+      backToFeed: "← Back to Feed",
     },
     creators: {
       eyebrow: "Creators",
@@ -127,6 +155,11 @@ const messages = {
       save: "Save",
       cancel: "Cancel",
       starred: "Starred",
+      tabVideos: "Videos",
+      tabArticles: "Articles",
+      tabNews: "News",
+      tabMarket: "Market",
+      comingSoon: "This section is coming soon",
       platformBilibili: "Bilibili",
       platformYoutube: "YouTube",
     },
@@ -139,6 +172,11 @@ const messages = {
       eyebrow: "Crawl Logs",
       title: "Scheduler activity timeline",
       description: "Crawler execution history will be shown here after job wiring is added.",
+    },
+    contentAnalysis: {
+      eyebrow: "Content Analysis",
+      title: "Content Analysis",
+      description: "AI-powered content analysis and investment insights — coming soon.",
     },
     auth: {
       loginEyebrow: "Welcome back",
@@ -177,6 +215,8 @@ type MessageKey =
   | "nav.creators"
   | "nav.settings"
   | "nav.crawlLogs"
+  | "nav.controlCenter"
+  | "nav.contentAnalysis"
   | "nav.signOut"
   | "feed.eyebrow"
   | "feed.title"
@@ -187,6 +227,13 @@ type MessageKey =
   | "feed.fetchError"
   | "feed.prevPage"
   | "feed.nextPage"
+  | "feed.tabVideos"
+  | "feed.tabArticles"
+  | "feed.tabNews"
+  | "feed.tabMarket"
+  | "feed.viewAll"
+  | "feed.comingSoon"
+  | "feed.backToFeed"
   | "creators.eyebrow"
   | "creators.title"
   | "creators.addPlaceholder"
@@ -202,6 +249,11 @@ type MessageKey =
   | "creators.save"
   | "creators.cancel"
   | "creators.starred"
+  | "creators.tabVideos"
+  | "creators.tabArticles"
+  | "creators.tabNews"
+  | "creators.tabMarket"
+  | "creators.comingSoon"
   | "creators.platformBilibili"
   | "creators.platformYoutube"
   | "settings.eyebrow"
@@ -210,6 +262,9 @@ type MessageKey =
   | "crawlLogs.eyebrow"
   | "crawlLogs.title"
   | "crawlLogs.description"
+  | "contentAnalysis.eyebrow"
+  | "contentAnalysis.title"
+  | "contentAnalysis.description"
   | "auth.loginEyebrow"
   | "auth.loginTitle"
   | "auth.registerEyebrow"

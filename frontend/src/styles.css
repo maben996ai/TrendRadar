@@ -600,6 +600,56 @@ a {
   cursor: not-allowed;
 }
 
+/* 动态页 hero 右侧控件列 */
+.hero-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+/* 作者详情页 hero */
+.author-hero-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.author-hero-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.creator-avatar-lg {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.back-link {
+  font-size: 0.82rem;
+  color: rgba(245, 241, 232, 0.56);
+  transition: color 160ms ease;
+}
+
+.back-link:hover {
+  color: #f5f1e8;
+}
+
+/* 查看全部链接 */
+.author-view-all {
+  margin-left: auto;
+  font-size: 0.78rem;
+  transition: color 160ms ease;
+}
+
+.author-view-all:hover {
+  color: #f5f1e8;
+}
+
 /* 作者分组 */
 .author-group {
   display: grid;
@@ -616,6 +666,11 @@ a {
 .author-group-name {
   font-weight: 600;
   font-size: 0.9rem;
+  transition: color 160ms ease;
+}
+
+.author-group-name:hover {
+  color: #f0b37a;
 }
 
 .author-group-count {

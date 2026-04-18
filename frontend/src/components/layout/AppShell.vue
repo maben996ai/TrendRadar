@@ -8,8 +8,8 @@
       <nav class="nav">
         <RouterLink to="/">{{ t("nav.feed") }}</RouterLink>
         <RouterLink to="/creators">{{ t("nav.creators") }}</RouterLink>
-        <RouterLink to="/settings">{{ t("nav.settings") }}</RouterLink>
-        <RouterLink to="/crawl-logs">{{ t("nav.crawlLogs") }}</RouterLink>
+        <RouterLink to="/content-analysis">{{ t("nav.contentAnalysis") }}</RouterLink>
+        <RouterLink to="/control-center">{{ t("nav.controlCenter") }}</RouterLink>
       </nav>
       <div class="sidebar-footer">
         <p class="muted sidebar-user">{{ authStore.user?.display_name ?? authStore.user?.email }}</p>
