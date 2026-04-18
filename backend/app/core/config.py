@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     youtube_api_key: str = ""
     bilibili_sessdata: str = ""
     nginx_conf_file: str = "nginx.http.conf"
+    dev_account_email: str = "maben996@gmail.com"
+    dev_account_display_name: str = "maben996"
+    dev_account_password: str = ""
 
     model_config = SettingsConfigDict(
         env_file=str(ROOT_ENV_FILE),
