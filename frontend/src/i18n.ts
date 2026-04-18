@@ -23,13 +23,14 @@ const messages = {
     },
     feed: {
       eyebrow: "内容动态",
-      title: "在同一时间线中追踪 Bilibili 与 YouTube 创作者更新。",
-      filterAll: "全部",
-      filterBilibili: "Bilibili",
-      filterYoutube: "YouTube",
+      title: "最新动态",
+      sortByTime: "按时间",
+      sortByAuthor: "按作者",
       loading: "加载中…",
       empty: "暂无视频，先去添加创作者并触发抓取吧。",
       fetchError: "加载失败，请稍后重试。",
+      prevPage: "上一页",
+      nextPage: "下一页",
     },
     creators: {
       eyebrow: "创作者",
@@ -100,14 +101,15 @@ const messages = {
       signOut: "Sign out",
     },
     feed: {
-      eyebrow: "Live Feed",
-      title: "Track creators across Bilibili and YouTube in one timeline.",
-      filterAll: "All",
-      filterBilibili: "Bilibili",
-      filterYoutube: "YouTube",
+      eyebrow: "Feed",
+      title: "Latest Updates",
+      sortByTime: "By Time",
+      sortByAuthor: "By Author",
       loading: "Loading…",
       empty: "No videos yet. Add a creator and trigger a crawl first.",
       fetchError: "Failed to load. Please try again.",
+      prevPage: "Prev",
+      nextPage: "Next",
     },
     creators: {
       eyebrow: "Creators",
@@ -178,12 +180,13 @@ type MessageKey =
   | "nav.signOut"
   | "feed.eyebrow"
   | "feed.title"
-  | "feed.filterAll"
-  | "feed.filterBilibili"
-  | "feed.filterYoutube"
+  | "feed.sortByTime"
+  | "feed.sortByAuthor"
   | "feed.loading"
   | "feed.empty"
   | "feed.fetchError"
+  | "feed.prevPage"
+  | "feed.nextPage"
   | "creators.eyebrow"
   | "creators.title"
   | "creators.addPlaceholder"
