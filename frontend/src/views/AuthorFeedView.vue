@@ -34,7 +34,10 @@
           </div>
           <div class="video-info-sm">
             <p class="video-title-sm">{{ video.title }}</p>
-            <span class="muted video-meta-sm">{{ formatPublishedAt(video.published_at) }}</span>
+            <div class="video-meta-sm">
+              <span class="muted">{{ formatPublishedAt(video.published_at) }}</span>
+              <span class="muted">{{ formatDuration(video.duration_seconds) }}</span>
+            </div>
           </div>
         </a>
       </div>
@@ -55,6 +58,7 @@ import { RouterLink, useRoute } from "vue-router";
 import { useI18n } from "../i18n";
 import { useFeedStore } from "../stores/feed";
 import { formatPublishedAt } from "../utils/datetime";
+import { formatDuration } from "../utils/duration";
 
 const { t } = useI18n();
 const route = useRoute();

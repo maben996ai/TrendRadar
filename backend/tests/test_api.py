@@ -93,6 +93,12 @@ class TestAuthMe:
 # ── creators ─────────────────────────────────────────────────────────────────
 
 class TestCreatorsAPI:
+    @pytest.fixture(autouse=True)
+    def _mock_background_crawl(self):
+        """避免每个创建 creator 的测试真的触发后台抓取。"""
+        with patch("app.api.creators._run_initial_crawl", new=AsyncMock(return_value=None)):
+            yield
+
     async def test_list_creators_empty_for_new_user(self, client, auth_headers):
         resp = await client.get("/api/creators", headers=auth_headers)
         assert resp.status_code == 200
@@ -161,7 +167,40 @@ class TestCreatorsAPI:
         resp = await client.delete("/api/creators/nonexistent-id", headers=auth_headers)
         assert resp.status_code == 404
 
-    async def test_trigger_crawl_returns_success(self, client, auth_headers, db):
+    async def test_create_creator_returns_initialized_at_null(self, client, auth_headers):
+        """新建信源响应里 initialized_at 为 null，表示正在初始化。"""
+        with patch(
+            "app.api.creators.resolve_creator",
+            new=AsyncMock(return_value=(Platform.BILIBILI, MOCK_CREATOR_INFO)),
+        ):
+            resp = await client.post(
+                "/api/creators",
+                json={"url": "https://space.bilibili.com/123456"},
+                headers=auth_headers,
+            )
+        assert resp.status_code == 201
+        assert resp.json()["initialized_at"] is None
+
+    async def test_create_creator_schedules_initialization_task(self, client, auth_headers):
+        """POST /api/creators 应在后台调度初始化流程，不阻塞响应。"""
+        mock_initial_crawl = AsyncMock(return_value=None)
+        with (
+            patch(
+                "app.api.creators.resolve_creator",
+                new=AsyncMock(return_value=(Platform.BILIBILI, MOCK_CREATOR_INFO)),
+            ),
+            patch("app.api.creators._run_initial_crawl", new=mock_initial_crawl),
+        ):
+            resp = await client.post(
+                "/api/creators",
+                json={"url": "https://space.bilibili.com/123456"},
+                headers=auth_headers,
+            )
+        assert resp.status_code == 201
+        mock_initial_crawl.assert_awaited_once()
+
+    async def test_manual_crawl_endpoint_removed(self, client, auth_headers):
+        """不再对外暴露手动触发抓取端点。"""
         with patch(
             "app.api.creators.resolve_creator",
             new=AsyncMock(return_value=(Platform.BILIBILI, MOCK_CREATOR_INFO)),
@@ -172,13 +211,8 @@ class TestCreatorsAPI:
                 headers=auth_headers,
             )
         creator_id = create_resp.json()["id"]
-
-        with patch("app.api.creators.crawl_creator", new=AsyncMock(return_value=3)):
-            resp = await client.post(f"/api/creators/{creator_id}/crawl", headers=auth_headers)
-
-        assert resp.status_code == 200
-        assert resp.json()["videos_found"] == 3
-        assert resp.json()["status"] == "success"
+        resp = await client.post(f"/api/creators/{creator_id}/crawl", headers=auth_headers)
+        assert resp.status_code in (404, 405)
 
     async def test_patch_creator_note(self, client, auth_headers):
         with patch(

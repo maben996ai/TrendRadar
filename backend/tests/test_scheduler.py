@@ -211,7 +211,137 @@ class TestCrawlCreatorDedup:
         assert row.thumbnail_url == "https://cdn/old.jpg"
 
 
+class TestCrawlCreatorInitialization:
+    async def test_first_crawl_sets_creator_initialized_at(self, db, session_factory):
+        """首次抓取结束后，creator.initialized_at 从 None 变为有值。"""
+        user = make_user()
+        db.add(user)
+        await db.flush()
+        creator = make_creator(user.id)
+        db.add(creator)
+        await db.commit()
+
+        async with session_factory() as s:
+            row = await s.get(Creator, creator.id)
+        assert row.initialized_at is None
+
+        mock_crawler = AsyncMock()
+        mock_crawler.fetch_latest_videos = AsyncMock(return_value=[make_video("BV001")])
+
+        with (
+            patch("app.services.scheduler.crawler_registry") as mock_registry,
+            patch("app.services.scheduler.AsyncSessionLocal", session_factory),
+            patch("app.services.scheduler._notifier.send_card", new=AsyncMock()),
+        ):
+            mock_registry.get.return_value = mock_crawler
+            await crawl_creator(creator)
+
+        async with session_factory() as s:
+            refreshed = await s.get(Creator, creator.id)
+        assert refreshed.initialized_at is not None
+
+    async def test_first_crawl_sets_initialized_at_even_when_no_videos(self, db, session_factory):
+        """即使抓取结果为空，也要结束初始化，避免前端一直转圈。"""
+        user = make_user()
+        db.add(user)
+        await db.flush()
+        creator = make_creator(user.id)
+        db.add(creator)
+        await db.commit()
+
+        mock_crawler = AsyncMock()
+        mock_crawler.fetch_latest_videos = AsyncMock(return_value=[])
+
+        with (
+            patch("app.services.scheduler.crawler_registry") as mock_registry,
+            patch("app.services.scheduler.AsyncSessionLocal", session_factory),
+        ):
+            mock_registry.get.return_value = mock_crawler
+            await crawl_creator(creator)
+
+        async with session_factory() as s:
+            refreshed = await s.get(Creator, creator.id)
+        assert refreshed.initialized_at is not None
+
+    async def test_subsequent_crawl_preserves_initialized_at(self, db, session_factory):
+        """再次抓取不应重置 initialized_at。"""
+        user = make_user()
+        db.add(user)
+        await db.flush()
+        initialized = datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC)
+        creator = make_creator(user.id)
+        creator.initialized_at = initialized
+        db.add(creator)
+        await db.flush()
+        existing = Video(
+            creator_id=creator.id,
+            platform_video_id="BV001",
+            title="Existing",
+            video_url="https://www.bilibili.com/video/BV001",
+            published_at=datetime(2024, 1, 1, tzinfo=UTC),
+            notified_at=datetime(2024, 1, 1, tzinfo=UTC),
+        )
+        db.add(existing)
+        await db.commit()
+
+        mock_crawler = AsyncMock()
+        mock_crawler.fetch_latest_videos = AsyncMock(return_value=[make_video("BV002")])
+
+        with (
+            patch("app.services.scheduler.crawler_registry") as mock_registry,
+            patch("app.services.scheduler.AsyncSessionLocal", session_factory),
+            patch("app.services.scheduler._notifier.send_card", new=AsyncMock()),
+        ):
+            mock_registry.get.return_value = mock_crawler
+            await crawl_creator(creator)
+
+        async with session_factory() as s:
+            refreshed = await s.get(Creator, creator.id)
+        assert refreshed.initialized_at is not None
+        assert refreshed.initialized_at.replace(tzinfo=UTC) == initialized
+
+
 class TestCrawlCreatorNotifications:
+    async def test_first_crawl_only_sends_latest_video_once(self, db, session_factory):
+        """首次抓取多条内容时，只发送最新 1 条通知。"""
+        user = make_user()
+        db.add(user)
+        await db.flush()
+        creator = make_creator(user.id)
+        db.add(creator)
+        db.add(
+            FeishuWebhook(
+                user_id=user.id,
+                name="test",
+                webhook_url="https://open.feishu.cn/x",
+                enabled=True,
+            )
+        )
+        await db.commit()
+
+        base = datetime(2024, 6, 1, tzinfo=UTC)
+        crawled = [
+            make_video("BV003", title="newest", published_at=base + timedelta(hours=2)),
+            make_video("BV002", title="middle", published_at=base + timedelta(hours=1)),
+            make_video("BV001", title="oldest", published_at=base),
+        ]
+        mock_crawler = AsyncMock()
+        mock_crawler.fetch_latest_videos = AsyncMock(return_value=crawled)
+
+        with (
+            patch("app.services.scheduler.crawler_registry") as mock_registry,
+            patch("app.services.scheduler.AsyncSessionLocal", session_factory),
+            patch("app.services.scheduler._notifier.send_card", new=AsyncMock()) as mock_send,
+        ):
+            mock_registry.get.return_value = mock_crawler
+            await crawl_creator(creator)
+
+        mock_send.assert_awaited_once()
+        _, kwargs = mock_send.await_args
+        assert kwargs["title"] == "newest"
+        assert kwargs["video_url"].endswith("BV003")
+        assert kwargs["is_new_creator"] is True
+
     async def test_first_crawl_premarks_older_videos_as_notified(self, db, session_factory):
         """首次抓取 3 条 → 除最新 1 条外 notified_at 被预填。"""
         user = make_user()

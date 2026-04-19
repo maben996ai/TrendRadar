@@ -63,6 +63,10 @@ async def crawl_creator(creator: Creator) -> int:
     async with AsyncSessionLocal() as db:
         if not videos:
             db.add(CrawlLog(creator_id=creator.id, status=CrawlLogStatus.SUCCESS, message=None, videos_found=0))
+            if is_first_crawl:
+                creator_row = await db.get(Creator, creator.id)
+                if creator_row is not None and creator_row.initialized_at is None:
+                    creator_row.initialized_at = datetime.now(UTC)
             await db.commit()
             return 0
 
@@ -98,6 +102,11 @@ async def crawl_creator(creator: Creator) -> int:
             now = datetime.now(UTC)
             for v in sorted_new[1:]:
                 v.notified_at = now
+
+        if is_first_crawl:
+            creator_row = await db.get(Creator, creator.id)
+            if creator_row is not None and creator_row.initialized_at is None:
+                creator_row.initialized_at = datetime.now(UTC)
 
         inserted_count = len(new_videos)
         db.add(

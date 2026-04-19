@@ -54,7 +54,7 @@ class YouTubeCrawler(BaseCrawler):
         # uploads playlist ID = replace leading "UC" with "UU"
         uploads_playlist_id = "UU" + creator_id[2:]
         async with httpx.AsyncClient(timeout=20) as client:
-            response = await client.get(
+            playlist_response = await client.get(
                 "https://www.googleapis.com/youtube/v3/playlistItems",
                 params={
                     "part": "snippet",
@@ -63,8 +63,31 @@ class YouTubeCrawler(BaseCrawler):
                     "key": settings.youtube_api_key,
                 },
             )
-            response.raise_for_status()
-            payload = response.json()
+            playlist_response.raise_for_status()
+            payload = playlist_response.json()
+
+            video_ids = [
+                (item.get("snippet") or {}).get("resourceId", {}).get("videoId")
+                for item in payload.get("items") or []
+            ]
+            video_ids = [video_id for video_id in video_ids if video_id]
+            details_by_id: dict[str, dict] = {}
+            if video_ids:
+                details_response = await client.get(
+                    "https://www.googleapis.com/youtube/v3/videos",
+                    params={
+                        "part": "contentDetails",
+                        "id": ",".join(video_ids),
+                        "key": settings.youtube_api_key,
+                    },
+                )
+                details_response.raise_for_status()
+                details_payload = details_response.json()
+                details_by_id = {
+                    item.get("id"): item
+                    for item in details_payload.get("items") or []
+                    if item.get("id")
+                }
 
         results: list[CrawledVideo] = []
         for item in payload.get("items") or []:
@@ -73,6 +96,10 @@ class YouTubeCrawler(BaseCrawler):
             if not video_id:
                 continue
             published_at = snippet.get("publishedAt")
+            merged_raw_data = dict(item)
+            details = details_by_id.get(video_id)
+            if details and details.get("contentDetails"):
+                merged_raw_data["contentDetails"] = details["contentDetails"]
             results.append(
                 CrawledVideo(
                     platform_video_id=video_id,
@@ -82,7 +109,7 @@ class YouTubeCrawler(BaseCrawler):
                     published_at=datetime.fromisoformat((published_at or "").replace("Z", "+00:00"))
                     if published_at
                     else datetime.now(UTC),
-                    raw_data=item,
+                    raw_data=merged_raw_data,
                 )
             )
         return results

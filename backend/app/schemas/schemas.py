@@ -57,6 +57,7 @@ class CreatorResponse(BaseModel):
     content_type: ContentType
     starred: bool
     notifications_enabled: bool
+    initialized_at: datetime | None = None
     created_at: datetime
 
 
@@ -70,6 +71,7 @@ class VideoResponse(BaseModel):
     thumbnail_url: str | None
     video_url: str
     published_at: datetime
+    duration_seconds: int | None = None
     notified_at: datetime | None = None
     creator_name: str
     creator_avatar_url: str | None

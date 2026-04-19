@@ -43,6 +43,19 @@ YOUTUBE_PLAYLIST_ITEMS_OK = {
     ]
 }
 
+YOUTUBE_VIDEOS_DETAILS_OK = {
+    "items": [
+        {
+            "id": "vid001",
+            "contentDetails": {"duration": "PT8M20S"},
+        },
+        {
+            "id": "vid002",
+            "contentDetails": {"duration": "PT1H8M20S"},
+        },
+    ]
+}
+
 
 def _with_api_key(settings_override):
     settings_override.youtube_api_key = "fake-api-key"
@@ -104,6 +117,9 @@ class TestYouTubeFetchLatestVideos:
         respx.get("https://www.googleapis.com/youtube/v3/playlistItems").mock(
             return_value=Response(200, json=YOUTUBE_PLAYLIST_ITEMS_OK)
         )
+        respx.get("https://www.googleapis.com/youtube/v3/videos").mock(
+            return_value=Response(200, json=YOUTUBE_VIDEOS_DETAILS_OK)
+        )
 
         with patch("app.services.crawlers.youtube.settings") as mock_settings:
             mock_settings.youtube_api_key = "fake-key"
@@ -120,6 +136,9 @@ class TestYouTubeFetchLatestVideos:
         respx.get("https://www.googleapis.com/youtube/v3/playlistItems").mock(
             return_value=Response(200, json=YOUTUBE_PLAYLIST_ITEMS_OK)
         )
+        respx.get("https://www.googleapis.com/youtube/v3/videos").mock(
+            return_value=Response(200, json=YOUTUBE_VIDEOS_DETAILS_OK)
+        )
 
         with patch("app.services.crawlers.youtube.settings") as mock_settings:
             mock_settings.youtube_api_key = "fake-key"
@@ -127,6 +146,38 @@ class TestYouTubeFetchLatestVideos:
 
         assert videos[0].published_at.year == 2024
         assert videos[0].published_at.month == 1
+
+    @respx.mock
+    async def test_duration_is_fetched_from_videos_api_and_added_to_raw_data(self):
+        respx.get("https://www.googleapis.com/youtube/v3/playlistItems").mock(
+            return_value=Response(200, json=YOUTUBE_PLAYLIST_ITEMS_OK)
+        )
+        respx.get("https://www.googleapis.com/youtube/v3/videos").mock(
+            return_value=Response(200, json=YOUTUBE_VIDEOS_DETAILS_OK)
+        )
+
+        with patch("app.services.crawlers.youtube.settings") as mock_settings:
+            mock_settings.youtube_api_key = "fake-key"
+            videos = await crawler.fetch_latest_videos("UCxxxxxx")
+
+        assert videos[0].raw_data["contentDetails"]["duration"] == "PT8M20S"
+        assert videos[1].raw_data["contentDetails"]["duration"] == "PT1H8M20S"
+
+    @respx.mock
+    async def test_missing_videos_details_does_not_break_fetch(self):
+        respx.get("https://www.googleapis.com/youtube/v3/playlistItems").mock(
+            return_value=Response(200, json=YOUTUBE_PLAYLIST_ITEMS_OK)
+        )
+        respx.get("https://www.googleapis.com/youtube/v3/videos").mock(
+            return_value=Response(200, json={"items": []})
+        )
+
+        with patch("app.services.crawlers.youtube.settings") as mock_settings:
+            mock_settings.youtube_api_key = "fake-key"
+            videos = await crawler.fetch_latest_videos("UCxxxxxx")
+
+        assert len(videos) == 2
+        assert "contentDetails" not in videos[0].raw_data
 
     async def test_no_api_key_returns_empty_list(self):
         with patch("app.services.crawlers.youtube.settings") as mock_settings:

@@ -445,9 +445,32 @@ class TestFeishuNotifier:
         img_element = next((e for e in elements if e.get("tag") == "img"), None)
         assert img_element is not None
         assert img_element["img_key"] == "img_v3_0001"
+        assert img_element["mode"] == "crop_center"
         # 使用 img 元素后不应再出现封面预览文案
         title_element = next((e for e in elements if e.get("tag") == "div" and "text" in e), None)
         assert "封面预览" not in title_element["text"]["content"]
+
+    async def test_send_card_uses_compact_card_layout_for_cover(self):
+        notifier = FeishuNotifier()
+        sent_payload = {}
+
+        with patch("app.services.notifiers.feishu.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client_cls.return_value = mock_client
+
+            await notifier.send_card(
+                webhook_url=WEBHOOK_URL,
+                title="港股分析",
+                creator_name="财经UP",
+                platform="bilibili",
+                video_url="https://www.bilibili.com/video/BV1",
+            )
+
+        card = sent_payload.get("card", {})
+        assert card.get("config", {}).get("wide_screen_mode") is False
 
     async def test_send_card_includes_published_at_second_precision(self):
         """published_at 有分秒信息 → 卡片 fields 含 yyyy-MM-dd HH:mm:ss。"""

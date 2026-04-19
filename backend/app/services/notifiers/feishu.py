@@ -81,7 +81,7 @@ class FeishuNotifier(BaseNotifier):
                     "tag": "img",
                     "img_key": image_key,
                     "alt": {"tag": "plain_text", "content": title},
-                    "mode": "fit_horizontal",
+                    "mode": "crop_center",
                     "preview": True,
                 }
             )
@@ -105,7 +105,7 @@ class FeishuNotifier(BaseNotifier):
         )
 
         card = {
-            "config": {"wide_screen_mode": True},
+            "config": {"wide_screen_mode": False},
             "header": {
                 "title": {"tag": "plain_text", "content": header_title},
                 "template": "blue" if is_new_creator else "green",

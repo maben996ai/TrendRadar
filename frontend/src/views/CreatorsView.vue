@@ -42,31 +42,47 @@
     <p v-else-if="fetchError" class="error-msg feed-state">{{ t("creators.fetchError") }}</p>
     <p v-else-if="creators.length === 0" class="muted feed-state">{{ t("creators.empty") }}</p>
 
-    <div v-else class="creator-list">
-      <div v-for="c in creators" :key="c.id" class="creator-row panel">
-        <img v-if="c.avatar_url" :src="c.avatar_url" class="creator-row-avatar" :alt="c.name" referrerpolicy="no-referrer" />
-        <div v-else class="creator-row-avatar creator-row-avatar-placeholder" />
+    <div v-else class="panel creator-list-panel">
+      <div ref="creatorListScrollRef" class="creator-list-scroll">
+        <div class="creator-list">
+          <div v-for="c in pagedCreators" :key="c.id" class="creator-row">
+            <img v-if="c.avatar_url" :src="c.avatar_url" class="creator-row-avatar" :alt="c.name" referrerpolicy="no-referrer" />
+            <div v-else class="creator-row-avatar creator-row-avatar-placeholder" />
 
-        <div class="creator-row-info">
-          <div class="creator-row-name-line">
-            <a :href="c.profile_url" target="_blank" rel="noopener noreferrer" class="creator-row-name">
-              {{ c.name }}
-            </a>
-            <span class="platform-badge" :class="c.platform">
-              {{ c.platform === "bilibili" ? t("creators.platformBilibili") : t("creators.platformYoutube") }}
-            </span>
-            <span v-if="c.starred" class="starred-badge">★</span>
-            <span v-if="c.category" class="category-tag">{{ c.category }}</span>
+            <div class="creator-row-info">
+              <div class="creator-row-name-line">
+                <a :href="c.profile_url" target="_blank" rel="noopener noreferrer" class="creator-row-name">
+                  {{ c.name }}
+                </a>
+                <span class="platform-badge creator-inline-platform" :class="c.platform">
+                  {{ c.platform === "bilibili" ? t("creators.platformBilibili") : t("creators.platformYoutube") }}
+                </span>
+                <span class="content-type-tag">
+                  {{ contentTypeLabel(c.content_type) }}
+                </span>
+                <span v-if="!c.initialized_at" class="creator-init-badge">
+                  <span class="creator-init-spinner" aria-hidden="true" />
+                  {{ t("creators.initializing") }}
+                </span>
+                <span v-if="c.starred" class="starred-badge">★</span>
+                <span v-if="c.category" class="category-tag">{{ c.category }}</span>
+              </div>
+              <p v-if="c.note" class="muted creator-row-note">{{ c.note }}</p>
+            </div>
+
+            <div class="creator-row-actions">
+              <button class="btn-icon" :title="c.starred ? '取消特别关注' : '特别关注'" @click="toggleStar(c)">
+                {{ c.starred ? "★" : "☆" }}
+              </button>
+              <button class="btn-icon edit-btn" title="编辑" @click="startEdit(c)">✎</button>
+              <button class="btn-icon delete-btn" title="删除" @click="handleDelete(c.id)">✕</button>
+            </div>
           </div>
-          <p v-if="c.note" class="muted creator-row-note">{{ c.note }}</p>
         </div>
-
-        <div class="creator-row-actions">
-          <button class="btn-icon" :title="c.starred ? '取消特别关注' : '特别关注'" @click="toggleStar(c)">
-            {{ c.starred ? "★" : "☆" }}
-          </button>
-          <button class="btn-icon edit-btn" title="编辑" @click="startEdit(c)">✎</button>
-          <button class="btn-icon delete-btn" title="删除" @click="handleDelete(c.id)">✕</button>
+        <div v-if="canPaginateCreators" class="pagination creator-pagination">
+          <button class="filter-btn" :disabled="page === 1" @click="page--">{{ t("feed.prevPage") }}</button>
+          <span class="muted page-indicator">{{ creatorPageLabel }}</span>
+          <button class="filter-btn" :disabled="page >= totalCreatorPages" @click="page++">{{ t("feed.nextPage") }}</button>
         </div>
       </div>
     </div>
@@ -104,7 +120,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 import { creatorsApi } from "../api/creators";
 import { useI18n } from "../i18n";
@@ -116,6 +132,9 @@ const contentType = ref<ContentType>("video");
 const creators = ref<Creator[]>([]);
 const loading = ref(false);
 const fetchError = ref(false);
+const page = ref(1);
+const CREATOR_PAGE_SIZE = 8;
+const creatorListScrollRef = ref<HTMLElement | null>(null);
 
 const addUrl = ref("");
 const adding = ref(false);
@@ -125,6 +144,30 @@ const editTarget = ref<Creator | null>(null);
 const editNote = ref("");
 const editCategory = ref("");
 const editContentType = ref<ContentType>("video");
+let initPollTimer: number | null = null;
+
+const totalCreatorPages = computed(() => Math.max(1, Math.ceil(creators.value.length / CREATOR_PAGE_SIZE)));
+const pagedCreators = computed(() => {
+  const start = (page.value - 1) * CREATOR_PAGE_SIZE;
+  return creators.value.slice(start, start + CREATOR_PAGE_SIZE);
+});
+const canPaginateCreators = computed(() => creators.value.length > CREATOR_PAGE_SIZE);
+const creatorPageLabel = computed(() => `${page.value} / ${totalCreatorPages.value}`);
+
+function clearInitPollTimer() {
+  if (initPollTimer !== null) {
+    window.clearTimeout(initPollTimer);
+    initPollTimer = null;
+  }
+}
+
+function scheduleInitPoll() {
+  clearInitPollTimer();
+  if (!creators.value.some((creator) => !creator.initialized_at)) return;
+  initPollTimer = window.setTimeout(() => {
+    fetchCreators();
+  }, 2000);
+}
 
 async function fetchCreators() {
   loading.value = true;
@@ -132,15 +175,20 @@ async function fetchCreators() {
   try {
     const resp = await creatorsApi.list({ content_type: contentType.value });
     creators.value = resp.data;
+    if (page.value > totalCreatorPages.value) {
+      page.value = totalCreatorPages.value;
+    }
   } catch {
     fetchError.value = true;
   } finally {
     loading.value = false;
+    scheduleInitPoll();
   }
 }
 
 function switchTab(tab: ContentType) {
   contentType.value = tab;
+  page.value = 1;
   fetchCreators();
 }
 
@@ -150,7 +198,9 @@ async function handleAdd() {
   try {
     const resp = await creatorsApi.create({ url: addUrl.value.trim(), content_type: contentType.value });
     creators.value.unshift(resp.data);
+    page.value = 1;
     addUrl.value = "";
+    scheduleInitPoll();
   } catch {
     addError.value = true;
   } finally {
@@ -162,6 +212,9 @@ async function handleDelete(id: string) {
   if (!confirm(t("creators.deleteConfirm"))) return;
   await creatorsApi.remove(id);
   creators.value = creators.value.filter((c) => c.id !== id);
+  if (page.value > totalCreatorPages.value) {
+    page.value = totalCreatorPages.value;
+  }
 }
 
 async function toggleStar(creator: Creator) {
@@ -193,5 +246,26 @@ async function submitEdit() {
   }
 }
 
+function contentTypeLabel(type: ContentType) {
+  switch (type) {
+    case "video":
+      return t("creators.tabVideos");
+    case "article":
+      return t("creators.tabArticles");
+    case "news":
+      return t("creators.tabNews");
+    case "market":
+      return t("creators.tabMarket");
+  }
+}
+
+watch(page, async () => {
+  await nextTick();
+  if (creatorListScrollRef.value) {
+    creatorListScrollRef.value.scrollTo({ top: 0, behavior: "smooth" });
+  }
+});
+
 onMounted(fetchCreators);
+onBeforeUnmount(clearInitPollTimer);
 </script>

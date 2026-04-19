@@ -14,7 +14,4 @@ export const creatorsApi = {
   remove(id: string) {
     return apiClient.delete(`/creators/${id}`);
   },
-  crawl(id: string) {
-    return apiClient.post(`/creators/${id}/crawl`);
-  },
 };
