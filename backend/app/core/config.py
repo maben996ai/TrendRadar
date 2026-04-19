@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     youtube_api_key: str = ""
     bilibili_sessdata: str = ""
     nginx_conf_file: str = "nginx.http.conf"
+    feishu_app_id: str = ""
+    feishu_app_secret: str = ""
 
     model_config = SettingsConfigDict(
         env_file=str(ROOT_ENV_FILE),

@@ -53,7 +53,7 @@
               <p class="video-title-sm">{{ video.title }}</p>
               <div class="video-meta-sm">
                 <span class="muted">{{ video.creator_name }}</span>
-                <span class="muted">{{ formatDate(video.published_at) }}</span>
+                <span class="muted">{{ formatPublishedAt(video.published_at) }}</span>
               </div>
             </div>
           </a>
@@ -93,7 +93,7 @@
               </div>
               <div class="video-info-sm">
                 <p class="video-title-sm">{{ video.title }}</p>
-                <span class="muted video-meta-sm">{{ formatDate(video.published_at) }}</span>
+                <span class="muted video-meta-sm">{{ formatPublishedAt(video.published_at) }}</span>
               </div>
             </a>
           </div>
@@ -110,6 +110,7 @@ import { RouterLink } from "vue-router";
 import { useI18n } from "../i18n";
 import { useFeedStore } from "../stores/feed";
 import type { Video } from "../types";
+import { formatPublishedAt } from "../utils/datetime";
 
 const { t } = useI18n();
 const feedStore = useFeedStore();
@@ -176,10 +177,6 @@ function setSortMode(mode: "time" | "author") {
 }
 
 watch([contentType, sortMode], () => { page.value = 1; });
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
 
 onMounted(() => feedStore.fetchVideos());
 </script>

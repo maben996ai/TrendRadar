@@ -1,11 +1,11 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.models.models import CrawlLog, CrawlLogStatus, Creator, Platform, User, Video
+from app.models.models import CrawlLog, CrawlLogStatus, Creator, FeishuWebhook, Platform, User, Video
 from app.services.crawlers.base import CrawledVideo
 from app.services.scheduler import SchedulerService, crawl_all_creators, crawl_creator
 
@@ -24,12 +24,16 @@ def make_creator(user_id: str, platform: Platform = Platform.BILIBILI) -> Creato
     )
 
 
-def make_video(platform_video_id: str = "BV001") -> CrawledVideo:
+def make_video(
+    platform_video_id: str = "BV001",
+    title: str = "Test Video",
+    published_at: datetime | None = None,
+) -> CrawledVideo:
     return CrawledVideo(
         platform_video_id=platform_video_id,
-        title="Test Video",
+        title=title,
         video_url=f"https://www.bilibili.com/video/{platform_video_id}",
-        published_at=datetime(2024, 1, 1, tzinfo=UTC),
+        published_at=published_at or datetime(2024, 1, 1, tzinfo=UTC),
     )
 
 
@@ -165,6 +169,197 @@ class TestCrawlCreator:
         async with session_factory() as s:
             log = await s.scalar(select(CrawlLog).where(CrawlLog.creator_id == creator.id))
         assert log.videos_found == 0
+
+
+class TestCrawlCreatorDedup:
+    async def test_existing_video_fields_are_not_overwritten(self, db, session_factory):
+        """已入库视频不应被 crawler 返回的新字段覆盖。"""
+        user = make_user()
+        db.add(user)
+        await db.flush()
+        creator = make_creator(user.id)
+        db.add(creator)
+        await db.flush()
+        existing = Video(
+            creator_id=creator.id,
+            platform_video_id="BV001",
+            title="Original Title",
+            thumbnail_url="https://cdn/old.jpg",
+            video_url="https://www.bilibili.com/video/BV001",
+            published_at=datetime(2024, 1, 1, tzinfo=UTC),
+        )
+        db.add(existing)
+        await db.commit()
+
+        mock_crawler = AsyncMock()
+        mock_crawler.fetch_latest_videos = AsyncMock(
+            return_value=[make_video("BV001", title="Updated Title")]
+        )
+
+        with (
+            patch("app.services.scheduler.crawler_registry") as mock_registry,
+            patch("app.services.scheduler.AsyncSessionLocal", session_factory),
+        ):
+            mock_registry.get.return_value = mock_crawler
+            await crawl_creator(creator)
+
+        async with session_factory() as s:
+            row = await s.scalar(
+                select(Video).where(Video.platform_video_id == "BV001")
+            )
+        assert row.title == "Original Title"
+        assert row.thumbnail_url == "https://cdn/old.jpg"
+
+
+class TestCrawlCreatorNotifications:
+    async def test_first_crawl_premarks_older_videos_as_notified(self, db, session_factory):
+        """首次抓取 3 条 → 除最新 1 条外 notified_at 被预填。"""
+        user = make_user()
+        db.add(user)
+        await db.flush()
+        creator = make_creator(user.id)
+        db.add(creator)
+        await db.commit()
+
+        base = datetime(2024, 6, 1, tzinfo=UTC)
+        crawled = [
+            make_video("BV003", title="newest", published_at=base + timedelta(hours=2)),
+            make_video("BV002", title="middle", published_at=base + timedelta(hours=1)),
+            make_video("BV001", title="oldest", published_at=base),
+        ]
+        mock_crawler = AsyncMock()
+        mock_crawler.fetch_latest_videos = AsyncMock(return_value=crawled)
+
+        with (
+            patch("app.services.scheduler.crawler_registry") as mock_registry,
+            patch("app.services.scheduler.AsyncSessionLocal", session_factory),
+            patch("app.services.scheduler._notifier.send_card", new=AsyncMock()),
+        ):
+            mock_registry.get.return_value = mock_crawler
+            await crawl_creator(creator)
+
+        async with session_factory() as s:
+            rows = list(
+                await s.scalars(
+                    select(Video).where(Video.creator_id == creator.id).order_by(Video.published_at.desc())
+                )
+            )
+        assert len(rows) == 3
+        # 最新一条 notified_at 为 None（或已被通知成功写入），另外两条被预标为已通知
+        assert rows[1].notified_at is not None
+        assert rows[2].notified_at is not None
+
+    async def test_successful_notification_sets_notified_at(self, db, session_factory):
+        """单 webhook 成功 → notified_at 被写入。"""
+        user = make_user()
+        db.add(user)
+        await db.flush()
+        creator = make_creator(user.id)
+        db.add(creator)
+        db.add(
+            FeishuWebhook(
+                user_id=user.id,
+                name="test",
+                webhook_url="https://open.feishu.cn/x",
+                enabled=True,
+            )
+        )
+        await db.commit()
+
+        mock_crawler = AsyncMock()
+        mock_crawler.fetch_latest_videos = AsyncMock(return_value=[make_video("BV001")])
+
+        with (
+            patch("app.services.scheduler.crawler_registry") as mock_registry,
+            patch("app.services.scheduler.AsyncSessionLocal", session_factory),
+            patch("app.services.scheduler._notifier.send_card", new=AsyncMock()) as mock_send,
+        ):
+            mock_registry.get.return_value = mock_crawler
+            await crawl_creator(creator)
+
+        mock_send.assert_awaited()
+        async with session_factory() as s:
+            row = await s.scalar(select(Video).where(Video.platform_video_id == "BV001"))
+        assert row.notified_at is not None
+
+    async def test_failed_notification_leaves_notified_at_null(self, db, session_factory):
+        """webhook 失败 → notified_at 保持 None，下次 tick 可重试。"""
+        user = make_user()
+        db.add(user)
+        await db.flush()
+        creator = make_creator(user.id)
+        db.add(creator)
+        db.add(
+            FeishuWebhook(
+                user_id=user.id,
+                name="test",
+                webhook_url="https://open.feishu.cn/x",
+                enabled=True,
+            )
+        )
+        await db.commit()
+
+        mock_crawler = AsyncMock()
+        mock_crawler.fetch_latest_videos = AsyncMock(return_value=[make_video("BV001")])
+
+        with (
+            patch("app.services.scheduler.crawler_registry") as mock_registry,
+            patch("app.services.scheduler.AsyncSessionLocal", session_factory),
+            patch(
+                "app.services.scheduler._notifier.send_card",
+                new=AsyncMock(side_effect=RuntimeError("boom")),
+            ),
+        ):
+            mock_registry.get.return_value = mock_crawler
+            await crawl_creator(creator)
+
+        async with session_factory() as s:
+            row = await s.scalar(select(Video).where(Video.platform_video_id == "BV001"))
+        assert row.notified_at is None
+
+    async def test_retry_succeeds_after_previous_failure(self, db, session_factory):
+        """首次失败后再次 tick：不再抓取新视频，但会重发之前未通知的。"""
+        user = make_user()
+        db.add(user)
+        await db.flush()
+        creator = make_creator(user.id)
+        db.add(creator)
+        await db.flush()
+        db.add(
+            FeishuWebhook(
+                user_id=user.id,
+                name="test",
+                webhook_url="https://open.feishu.cn/x",
+                enabled=True,
+            )
+        )
+        # 已入库且通知失败过
+        existing = Video(
+            creator_id=creator.id,
+            platform_video_id="BV001",
+            title="pending",
+            video_url="https://www.bilibili.com/video/BV001",
+            published_at=datetime(2024, 6, 1, tzinfo=UTC),
+            notified_at=None,
+        )
+        db.add(existing)
+        await db.commit()
+
+        mock_crawler = AsyncMock()
+        mock_crawler.fetch_latest_videos = AsyncMock(return_value=[make_video("BV001", title="pending")])
+
+        with (
+            patch("app.services.scheduler.crawler_registry") as mock_registry,
+            patch("app.services.scheduler.AsyncSessionLocal", session_factory),
+            patch("app.services.scheduler._notifier.send_card", new=AsyncMock()) as mock_send,
+        ):
+            mock_registry.get.return_value = mock_crawler
+            await crawl_creator(creator)
+
+        mock_send.assert_awaited()
+        async with session_factory() as s:
+            row = await s.scalar(select(Video).where(Video.platform_video_id == "BV001"))
+        assert row.notified_at is not None
 
 
 class TestCrawlAllCreators:

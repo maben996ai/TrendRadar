@@ -70,6 +70,7 @@ class VideoResponse(BaseModel):
     thumbnail_url: str | None
     video_url: str
     published_at: datetime
+    notified_at: datetime | None = None
     creator_name: str
     creator_avatar_url: str | None
     platform: Platform

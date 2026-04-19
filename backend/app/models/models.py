@@ -110,6 +110,9 @@ class Video(Base):
     video_url: Mapped[str] = mapped_column(Text())
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     raw_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    notified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     creator: Mapped[Creator] = relationship(back_populates="videos")
