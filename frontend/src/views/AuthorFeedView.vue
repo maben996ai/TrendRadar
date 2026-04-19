@@ -34,7 +34,10 @@
           </div>
           <div class="video-info-sm">
             <p class="video-title-sm">{{ video.title }}</p>
-            <span class="muted video-meta-sm">{{ formatDate(video.published_at) }}</span>
+            <div class="video-meta-sm">
+              <span class="muted">{{ formatPublishedAt(video.published_at) }}</span>
+              <span class="muted">{{ formatDuration(video.duration_seconds) }}</span>
+            </div>
           </div>
         </a>
       </div>
@@ -54,6 +57,8 @@ import { RouterLink, useRoute } from "vue-router";
 
 import { useI18n } from "../i18n";
 import { useFeedStore } from "../stores/feed";
+import { formatPublishedAt } from "../utils/datetime";
+import { formatDuration } from "../utils/duration";
 
 const { t } = useI18n();
 const route = useRoute();
@@ -79,10 +84,6 @@ const pagedVideos = computed(() => {
   const start = (page.value - 1) * PAGE_SIZE;
   return authorVideos.value.slice(start, start + PAGE_SIZE);
 });
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
 
 onMounted(() => {
   if (!feedStore.videos.length) feedStore.fetchVideos();

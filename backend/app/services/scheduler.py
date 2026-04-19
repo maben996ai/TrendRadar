@@ -1,4 +1,6 @@
 import asyncio
+import logging
+from datetime import UTC, datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import func, select
@@ -7,6 +9,8 @@ from app.core.database import AsyncSessionLocal
 from app.models.models import CrawlLogStatus, Creator, CrawlLog, FeishuWebhook, Video
 from app.services.crawlers.registry import crawler_registry
 from app.services.notifiers.feishu import FeishuNotifier
+
+logger = logging.getLogger(__name__)
 
 _notifier = FeishuNotifier()
 
@@ -55,82 +59,113 @@ async def crawl_creator(creator: Creator) -> int:
 
     videos = await crawler.fetch_latest_videos(creator.platform_creator_id, limit=limit)
 
+    inserted_count = 0
     async with AsyncSessionLocal() as db:
         if not videos:
             db.add(CrawlLog(creator_id=creator.id, status=CrawlLogStatus.SUCCESS, message=None, videos_found=0))
+            if is_first_crawl:
+                creator_row = await db.get(Creator, creator.id)
+                if creator_row is not None and creator_row.initialized_at is None:
+                    creator_row.initialized_at = datetime.now(UTC)
             await db.commit()
             return 0
 
         fetched_ids = {v.platform_video_id for v in videos}
-        existing_rows = {
-            row.platform_video_id: row
-            for row in await db.scalars(
-                select(Video).where(
+        existing_ids = set(
+            await db.scalars(
+                select(Video.platform_video_id).where(
                     Video.creator_id == creator.id,
                     Video.platform_video_id.in_(fetched_ids),
                 )
             )
-        }
+        )
 
-        inserted_videos: list[Video] = []
+        new_videos: list[Video] = []
         for video in videos:
-            if video.platform_video_id in existing_rows:
-                row = existing_rows[video.platform_video_id]
-                row.title = video.title
-                row.thumbnail_url = video.thumbnail_url
-                row.video_url = video.video_url
-                row.raw_data = video.raw_data
-            else:
-                new_video = Video(
-                    creator_id=creator.id,
-                    platform_video_id=video.platform_video_id,
-                    title=video.title,
-                    thumbnail_url=video.thumbnail_url,
-                    video_url=video.video_url,
-                    published_at=video.published_at,
-                    raw_data=video.raw_data,
-                )
-                db.add(new_video)
-                inserted_videos.append(new_video)
+            if video.platform_video_id in existing_ids:
+                continue
+            new_video = Video(
+                creator_id=creator.id,
+                platform_video_id=video.platform_video_id,
+                title=video.title,
+                thumbnail_url=video.thumbnail_url,
+                video_url=video.video_url,
+                published_at=video.published_at,
+                raw_data=video.raw_data,
+            )
+            db.add(new_video)
+            new_videos.append(new_video)
 
+        # 首次抓取：除最新 1 条外，全部预标为已通知，避免"升级即爆量"
+        if is_first_crawl and len(new_videos) > 1:
+            sorted_new = sorted(new_videos, key=lambda v: v.published_at, reverse=True)
+            now = datetime.now(UTC)
+            for v in sorted_new[1:]:
+                v.notified_at = now
+
+        if is_first_crawl:
+            creator_row = await db.get(Creator, creator.id)
+            if creator_row is not None and creator_row.initialized_at is None:
+                creator_row.initialized_at = datetime.now(UTC)
+
+        inserted_count = len(new_videos)
         db.add(
             CrawlLog(
                 creator_id=creator.id,
                 status=CrawlLogStatus.SUCCESS,
                 message=None,
-                videos_found=len(inserted_videos),
+                videos_found=inserted_count,
             )
         )
         await db.commit()
 
-    # Send notifications after commit
-    if creator.notifications_enabled and inserted_videos:
-        webhook_urls = await _get_webhook_urls(creator.user_id)
+    # 通知阶段：扫描 notified_at IS NULL 的待发视频，任一失败则保持 None 供下次重试
+    if not creator.notifications_enabled:
+        return inserted_count
+
+    webhook_urls = await _get_webhook_urls(creator.user_id)
+    if not webhook_urls:
+        return inserted_count
+
+    async with AsyncSessionLocal() as db:
+        pending = list(
+            await db.scalars(
+                select(Video)
+                .where(Video.creator_id == creator.id, Video.notified_at.is_(None))
+                .order_by(Video.published_at.desc())
+            )
+        )
+
+    for video in pending:
+        all_ok = True
         for webhook_url in webhook_urls:
-            if is_first_crawl:
-                video_to_notify = inserted_videos[0]
+            try:
                 await _notifier.send_card(
                     webhook_url=webhook_url,
-                    title=video_to_notify.title,
+                    title=video.title,
                     creator_name=creator.name,
                     platform=creator.platform,
-                    video_url=video_to_notify.video_url,
-                    thumbnail_url=video_to_notify.thumbnail_url,
-                    is_new_creator=True,
+                    video_url=video.video_url,
+                    thumbnail_url=video.thumbnail_url,
+                    published_at=video.published_at,
+                    is_new_creator=is_first_crawl,
                 )
-            else:
-                for video in inserted_videos:
-                    await _notifier.send_card(
-                        webhook_url=webhook_url,
-                        title=video.title,
-                        creator_name=creator.name,
-                        platform=creator.platform,
-                        video_url=video.video_url,
-                        thumbnail_url=video.thumbnail_url,
-                        is_new_creator=False,
-                    )
+            except Exception as exc:
+                logger.warning(
+                    "Feishu notify failed for video=%s webhook=%s: %s",
+                    video.id,
+                    webhook_url,
+                    exc,
+                )
+                all_ok = False
+        if all_ok:
+            async with AsyncSessionLocal() as db:
+                row = await db.get(Video, video.id)
+                if row is not None:
+                    row.notified_at = datetime.now(UTC)
+                    await db.commit()
 
-    return len(inserted_videos)
+    return inserted_count
 
 
 async def crawl_all_creators() -> None:

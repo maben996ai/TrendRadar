@@ -12,6 +12,7 @@ export interface Creator {
   content_type: ContentType;
   starred: boolean;
   notifications_enabled: boolean;
+  initialized_at?: string | null;
   created_at: string;
 }
 
@@ -24,6 +25,7 @@ export interface Video {
   thumbnail_url?: string | null;
   video_url: string;
   published_at: string;
+  duration_seconds?: number | null;
   creator_name: string;
   creator_avatar_url?: string | null;
 }

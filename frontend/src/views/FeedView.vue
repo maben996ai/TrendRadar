@@ -13,8 +13,8 @@
           <button class="filter-btn" :class="{ active: contentType === 'market' }" @click="setContentType('market')">{{ t("feed.tabMarket") }}</button>
         </div>
         <div class="feed-filters">
-          <button class="filter-btn" :class="{ active: sortMode === 'time' }" @click="setSortMode('time')">{{ t("feed.sortByTime") }}</button>
           <button class="filter-btn" :class="{ active: sortMode === 'author' }" @click="setSortMode('author')">{{ t("feed.sortByAuthor") }}</button>
+          <button class="filter-btn" :class="{ active: sortMode === 'time' }" @click="setSortMode('time')">{{ t("feed.sortByTime") }}</button>
         </div>
       </div>
     </div>
@@ -33,8 +33,57 @@
     </template>
 
     <template v-else>
-      <!-- 按时间排序：分页平铺 -->
-      <template v-if="sortMode === 'time'">
+      <!-- 按作者分组：每页最多 4 个作者 -->
+      <template v-if="sortMode === 'author'">
+        <div class="panel author-groups-panel">
+          <div class="author-groups-scroll">
+            <div v-for="group in pagedAuthorGroups" :key="group.creatorId" class="author-group">
+              <div class="author-group-header">
+                <img v-if="group.avatarUrl" :src="group.avatarUrl" class="creator-avatar" :alt="group.creatorName" referrerpolicy="no-referrer" />
+                <div v-else class="creator-avatar creator-avatar-placeholder" />
+                <div class="author-group-title-row">
+                  <RouterLink :to="`/author/${group.creatorId}`" class="author-group-name">{{ group.creatorName }}</RouterLink>
+                  <span class="platform-badge author-inline-platform" :class="group.platform">{{ group.platform }}</span>
+                </div>
+                <RouterLink :to="`/author/${group.creatorId}`" class="author-view-all muted">
+                  {{ t("feed.viewAll") }} {{ group.videos.length }} →
+                </RouterLink>
+              </div>
+              <div class="video-grid-sm">
+                <a
+                  v-for="video in group.videos.slice(0, 5)"
+                  :key="video.id"
+                  :href="video.video_url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="video-card-sm"
+                >
+                  <div class="video-thumb-sm">
+                    <img v-if="video.thumbnail_url" :src="video.thumbnail_url" :alt="video.title" loading="lazy" referrerpolicy="no-referrer" />
+                    <div v-else class="video-thumb-placeholder" />
+                  </div>
+                  <div class="video-info-sm">
+                    <p class="video-title-sm">{{ video.title }}</p>
+                    <div class="video-meta-sm">
+                      <span class="muted">{{ formatPublishedAt(video.published_at) }}</span>
+                      <span class="muted">{{ formatDuration(video.duration_seconds) }}</span>
+                    </div>
+                  </div>
+                </a>
+              </div>
+            </div>
+
+            <div v-if="canPaginateAuthors" class="pagination author-pagination">
+              <button class="filter-btn" :disabled="page === 1 || feedStore.loadingMore" @click="page--">{{ t("feed.prevPage") }}</button>
+              <span class="muted page-indicator">{{ authorPageLabel }}</span>
+              <button class="filter-btn" :disabled="!canGoNextAuthor || feedStore.loadingMore" @click="goNextAuthorPage">{{ t("feed.nextPage") }}</button>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- 按时间排序：默认预加载 3 页，往后翻页时继续请求 -->
+      <template v-else>
         <div class="video-grid-sm">
           <a
             v-for="video in pagedVideos"
@@ -51,52 +100,21 @@
             </div>
             <div class="video-info-sm">
               <p class="video-title-sm">{{ video.title }}</p>
-              <div class="video-meta-sm">
-                <span class="muted">{{ video.creator_name }}</span>
-                <span class="muted">{{ formatDate(video.published_at) }}</span>
+              <div class="video-meta-stack-sm">
+                <span class="muted video-meta-line-sm">{{ video.creator_name }}</span>
+                <div class="video-meta-sm">
+                  <span class="muted">{{ formatPublishedAt(video.published_at) }}</span>
+                  <span class="muted">{{ formatDuration(video.duration_seconds) }}</span>
+                </div>
               </div>
             </div>
           </a>
         </div>
 
-        <div v-if="totalPages > 1" class="pagination">
-          <button class="filter-btn" :disabled="page === 1" @click="page--">{{ t("feed.prevPage") }}</button>
-          <span class="muted page-indicator">{{ page }} / {{ totalPages }}</span>
-          <button class="filter-btn" :disabled="page === totalPages" @click="page++">{{ t("feed.nextPage") }}</button>
-        </div>
-      </template>
-
-      <!-- 按作者分组：每组最多展示前 5 条，点击作者进入详情页 -->
-      <template v-else>
-        <div v-for="group in authorGroups" :key="group.creatorId" class="author-group">
-          <div class="author-group-header">
-            <img v-if="group.avatarUrl" :src="group.avatarUrl" class="creator-avatar" :alt="group.creatorName" referrerpolicy="no-referrer" />
-            <div v-else class="creator-avatar creator-avatar-placeholder" />
-            <RouterLink :to="`/author/${group.creatorId}`" class="author-group-name">{{ group.creatorName }}</RouterLink>
-            <span class="platform-badge" :class="group.platform">{{ group.platform }}</span>
-            <RouterLink :to="`/author/${group.creatorId}`" class="author-view-all muted">
-              {{ t("feed.viewAll") }} {{ group.videos.length }} →
-            </RouterLink>
-          </div>
-          <div class="video-grid-sm">
-            <a
-              v-for="video in group.videos.slice(0, 5)"
-              :key="video.id"
-              :href="video.video_url"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="video-card-sm"
-            >
-              <div class="video-thumb-sm">
-                <img v-if="video.thumbnail_url" :src="video.thumbnail_url" :alt="video.title" loading="lazy" referrerpolicy="no-referrer" />
-                <div v-else class="video-thumb-placeholder" />
-              </div>
-              <div class="video-info-sm">
-                <p class="video-title-sm">{{ video.title }}</p>
-                <span class="muted video-meta-sm">{{ formatDate(video.published_at) }}</span>
-              </div>
-            </a>
-          </div>
+        <div v-if="canPaginateTime" class="pagination">
+          <button class="filter-btn" :disabled="page === 1 || feedStore.loadingMore" @click="page--">{{ t("feed.prevPage") }}</button>
+          <span class="muted page-indicator">{{ timePageLabel }}</span>
+          <button class="filter-btn" :disabled="!canGoNextTime || feedStore.loadingMore" @click="goNextTimePage">{{ t("feed.nextPage") }}</button>
         </div>
       </template>
     </template>
@@ -110,13 +128,16 @@ import { RouterLink } from "vue-router";
 import { useI18n } from "../i18n";
 import { useFeedStore } from "../stores/feed";
 import type { Video } from "../types";
+import { formatPublishedAt } from "../utils/datetime";
+import { formatDuration } from "../utils/duration";
 
 const { t } = useI18n();
 const feedStore = useFeedStore();
 
-const PAGE_SIZE = 15;
+const VIDEO_PAGE_SIZE = 15;
+const AUTHOR_PAGE_SIZE = 4;
 const contentType = ref<"video" | "article" | "news" | "market">("video");
-const sortMode = ref<"time" | "author">("time");
+const sortMode = ref<"time" | "author">("author");
 const page = ref(1);
 
 const sortedByTime = computed(() =>
@@ -125,10 +146,10 @@ const sortedByTime = computed(() =>
   )
 );
 
-const totalPages = computed(() => Math.max(1, Math.ceil(sortedByTime.value.length / PAGE_SIZE)));
+const knownTimePages = computed(() => Math.max(1, Math.ceil(sortedByTime.value.length / VIDEO_PAGE_SIZE)));
 const pagedVideos = computed(() => {
-  const start = (page.value - 1) * PAGE_SIZE;
-  return sortedByTime.value.slice(start, start + PAGE_SIZE);
+  const start = (page.value - 1) * VIDEO_PAGE_SIZE;
+  return sortedByTime.value.slice(start, start + VIDEO_PAGE_SIZE);
 });
 
 interface AuthorGroup {
@@ -165,6 +186,23 @@ const authorGroups = computed((): AuthorGroup[] => {
   );
 });
 
+const knownAuthorPages = computed(() => Math.max(1, Math.ceil(authorGroups.value.length / AUTHOR_PAGE_SIZE)));
+const pagedAuthorGroups = computed(() => {
+  const start = (page.value - 1) * AUTHOR_PAGE_SIZE;
+  return authorGroups.value.slice(start, start + AUTHOR_PAGE_SIZE);
+});
+
+const canGoNextTime = computed(() => page.value < knownTimePages.value || feedStore.hasMore);
+const canGoNextAuthor = computed(() => page.value < knownAuthorPages.value || feedStore.hasMore);
+const canPaginateTime = computed(() => knownTimePages.value > 1 || feedStore.hasMore);
+const canPaginateAuthors = computed(() => knownAuthorPages.value > 1 || feedStore.hasMore);
+const timePageLabel = computed(() =>
+  feedStore.hasMore ? `${page.value} / ${knownTimePages.value}+` : `${page.value} / ${knownTimePages.value}`
+);
+const authorPageLabel = computed(() =>
+  feedStore.hasMore ? `${page.value} / ${knownAuthorPages.value}+` : `${page.value} / ${knownAuthorPages.value}`
+);
+
 function setContentType(type: typeof contentType.value) {
   contentType.value = type;
   page.value = 1;
@@ -175,11 +213,53 @@ function setSortMode(mode: "time" | "author") {
   page.value = 1;
 }
 
-watch([contentType, sortMode], () => { page.value = 1; });
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+async function ensureTimePageLoaded(targetPage: number) {
+  await feedStore.ensureVideoCount(targetPage * VIDEO_PAGE_SIZE);
 }
 
-onMounted(() => feedStore.fetchVideos());
+async function ensureAuthorPageLoaded(targetPage: number) {
+  const requiredAuthors = targetPage * AUTHOR_PAGE_SIZE;
+  while (authorGroups.value.length < requiredAuthors && feedStore.hasMore) {
+    await feedStore.fetchNextPage();
+  }
+}
+
+async function ensureCurrentPageLoaded() {
+  if (contentType.value !== "video") return;
+  if (sortMode.value === "author") {
+    await ensureAuthorPageLoaded(page.value);
+    return;
+  }
+  await ensureTimePageLoaded(page.value);
+}
+
+async function goNextTimePage() {
+  const nextPage = page.value + 1;
+  await ensureTimePageLoaded(nextPage);
+  if (nextPage <= knownTimePages.value || feedStore.hasMore || sortedByTime.value.length >= nextPage * VIDEO_PAGE_SIZE) {
+    page.value = nextPage;
+  }
+}
+
+async function goNextAuthorPage() {
+  const nextPage = page.value + 1;
+  await ensureAuthorPageLoaded(nextPage);
+  if (nextPage <= knownAuthorPages.value || feedStore.hasMore || authorGroups.value.length >= nextPage * AUTHOR_PAGE_SIZE) {
+    page.value = nextPage;
+  }
+}
+
+watch([contentType, sortMode], () => {
+  page.value = 1;
+  void ensureCurrentPageLoaded();
+});
+
+watch(page, () => {
+  void ensureCurrentPageLoaded();
+});
+
+onMounted(async () => {
+  await feedStore.fetchVideos(3);
+  await ensureCurrentPageLoaded();
+});
 </script>

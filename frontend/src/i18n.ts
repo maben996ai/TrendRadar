@@ -51,6 +51,7 @@ const messages = {
       loading: "加载中…",
       fetchError: "加载失败，请稍后重试。",
       addError: "添加失败，请检查链接格式或网络。",
+      initializing: "初始化中…",
       deleteConfirm: "确认删除该创作者？",
       notePlaceholder: "备注（可选）",
       categoryPlaceholder: "分类（可选）",
@@ -149,6 +150,7 @@ const messages = {
       loading: "Loading…",
       fetchError: "Failed to load. Please try again.",
       addError: "Failed to add. Check the URL format or your connection.",
+      initializing: "Initializing…",
       deleteConfirm: "Delete this creator?",
       notePlaceholder: "Note (optional)",
       categoryPlaceholder: "Category (optional)",
@@ -243,6 +245,7 @@ type MessageKey =
   | "creators.loading"
   | "creators.fetchError"
   | "creators.addError"
+  | "creators.initializing"
   | "creators.deleteConfirm"
   | "creators.notePlaceholder"
   | "creators.categoryPlaceholder"

@@ -318,6 +318,31 @@ a {
   color: rgba(245, 241, 232, 0.32);
 }
 
+.creator-list-panel {
+  padding: 18px 18px 10px;
+}
+
+.creator-list-scroll {
+  max-height: min(72vh, 1120px);
+  overflow-y: auto;
+  padding-right: 6px;
+  display: grid;
+  gap: 14px;
+}
+
+.creator-list-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.creator-list-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+}
+
+.creator-list-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .creator-list {
   display: grid;
   gap: 12px;
@@ -328,6 +353,9 @@ a {
   align-items: center;
   gap: 16px;
   padding: 16px 20px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .creator-row-avatar {
@@ -365,6 +393,19 @@ a {
   text-decoration: underline;
 }
 
+.content-type-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(231, 122, 69, 0.14);
+  color: #efb767;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 .creator-row-note {
   margin: 0;
   font-size: 0.82rem;
@@ -384,10 +425,42 @@ a {
   color: rgba(245, 241, 232, 0.72);
 }
 
+.creator-init-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(243, 186, 74, 0.14);
+  color: #f3ba4a;
+  font-size: 0.74rem;
+}
+
+.creator-init-spinner {
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(243, 186, 74, 0.3);
+  border-top-color: #f3ba4a;
+  border-radius: 50%;
+  animation: creator-spin 0.8s linear infinite;
+}
+
+@keyframes creator-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .creator-row-actions {
   display: flex;
   gap: 6px;
   flex-shrink: 0;
+}
+
+.creator-pagination {
+  padding-top: 10px;
+  margin-top: 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .btn-icon {
@@ -502,6 +575,16 @@ a {
   color: #fff;
 }
 
+.platform-badge.creator-inline-platform {
+  position: static;
+  top: auto;
+  left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 /* 小卡片 — 5 列 */
 .video-grid-sm {
   display: grid;
@@ -571,6 +654,18 @@ a {
   font-size: 0.7rem;
   gap: 4px;
   margin-top: auto;
+}
+
+.video-meta-stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: auto;
+}
+
+.video-meta-line-sm {
+  font-size: 0.7rem;
+  line-height: 1.3;
 }
 
 .creator-avatar {
@@ -655,9 +750,41 @@ a {
 }
 
 /* 作者分组 */
+.author-groups-panel {
+  padding: 18px 18px 10px;
+}
+
+.author-groups-scroll {
+  max-height: min(72vh, 1120px);
+  overflow-y: auto;
+  padding-right: 6px;
+  display: grid;
+  gap: 18px;
+}
+
+.author-groups-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.author-groups-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+}
+
+.author-groups-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .author-group {
   display: grid;
   gap: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.author-group:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
 .author-group-header {
@@ -667,19 +794,43 @@ a {
   padding: 4px 0;
 }
 
+.author-group-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .author-group-name {
   font-weight: 600;
   font-size: 0.9rem;
   transition: color 160ms ease;
+  min-width: 0;
 }
 
 .author-group-name:hover {
   color: #f0b37a;
 }
 
+.author-inline-platform {
+  position: static;
+  top: auto;
+  left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 .author-group-count {
   font-size: 0.78rem;
   margin-left: auto;
+}
+
+.author-pagination {
+  padding-top: 10px;
+  margin-top: 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 @media (max-width: 900px) {

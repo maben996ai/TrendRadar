@@ -1,6 +1,7 @@
 import base64
 import binascii
 import json
+import re
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -17,6 +18,56 @@ router = APIRouter()
 
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
+
+
+def _parse_hms_duration(value: str) -> int | None:
+    parts = value.strip().split(":")
+    if not 2 <= len(parts) <= 3 or not all(part.isdigit() for part in parts):
+        return None
+    numbers = [int(part) for part in parts]
+    if len(numbers) == 2:
+        minutes, seconds = numbers
+        return minutes * 60 + seconds
+    hours, minutes, seconds = numbers
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def _parse_iso8601_duration(value: str) -> int | None:
+    match = re.fullmatch(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", value)
+    if not match:
+        return None
+    hours = int(match.group(1) or 0)
+    minutes = int(match.group(2) or 0)
+    seconds = int(match.group(3) or 0)
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def _extract_duration_seconds(raw_data: dict | None) -> int | None:
+    if not raw_data:
+        return None
+
+    candidates = [
+        raw_data.get("duration"),
+        raw_data.get("length"),
+        raw_data.get("duration_seconds"),
+        raw_data.get("lengthSeconds"),
+        (raw_data.get("contentDetails") or {}).get("duration"),
+    ]
+    for value in candidates:
+        if value is None:
+            continue
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str):
+            if value.isdigit():
+                return int(value)
+            parsed = _parse_hms_duration(value)
+            if parsed is not None:
+                return parsed
+            parsed = _parse_iso8601_duration(value)
+            if parsed is not None:
+                return parsed
+    return None
 
 
 def _encode_cursor(published_at: str, video_id: str) -> str:
@@ -80,6 +131,7 @@ async def list_videos(
             thumbnail_url=v.thumbnail_url,
             video_url=v.video_url,
             published_at=v.published_at,
+            duration_seconds=_extract_duration_seconds(v.raw_data),
             creator_name=v.creator.name,
             creator_avatar_url=v.creator.avatar_url,
             platform=v.creator.platform,

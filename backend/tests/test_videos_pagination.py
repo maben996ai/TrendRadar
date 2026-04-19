@@ -86,6 +86,25 @@ class TestVideosPaginatedResponse:
         assert "published_at" in item
         assert "creator_name" in item
 
+    async def test_items_include_duration_seconds_when_present_in_raw_data(self, client, auth_headers, db):
+        me = await client.get("/api/auth/me", headers=auth_headers)
+        user_id = me.json()["id"]
+        creator = await _seed_creator(db, user_id)
+        video = Video(
+            creator_id=creator.id,
+            platform_video_id="BV_duration",
+            title="Video with duration",
+            video_url="https://www.bilibili.com/video/BV_duration",
+            published_at=datetime(2024, 1, 1, tzinfo=UTC),
+            raw_data={"length": "01:08:20"},
+        )
+        db.add(video)
+        await db.commit()
+
+        resp = await client.get("/api/videos", headers=auth_headers)
+        item = resp.json()["items"][0]
+        assert item["duration_seconds"] == 4100
+
     async def test_limit_param_restricts_items(self, client, auth_headers, db):
         me = await client.get("/api/auth/me", headers=auth_headers)
         user_id = me.json()["id"]

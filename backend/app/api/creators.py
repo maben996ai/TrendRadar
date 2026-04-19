@@ -1,15 +1,30 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+import logging
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.database import get_db
-from app.models.models import ContentType, CrawlLogStatus, Creator, User
-from app.schemas.schemas import CrawlAcceptedResponse, CreatorCreate, CreatorResponse, CreatorUpdate
+from app.core.database import AsyncSessionLocal, get_db
+from app.models.models import ContentType, Creator, User
+from app.schemas.schemas import CreatorCreate, CreatorResponse, CreatorUpdate
 from app.services.resolver import resolve_creator
 from app.services.scheduler import crawl_creator
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+async def _run_initial_crawl(creator_id: str) -> None:
+    """后台任务：独立加载 creator，再执行首次抓取。"""
+    async with AsyncSessionLocal() as db:
+        creator = await db.get(Creator, creator_id)
+    if creator is None:
+        return
+    try:
+        await crawl_creator(creator)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Initial crawl failed for creator=%s: %s", creator_id, exc)
 
 
 @router.get("", response_model=list[CreatorResponse])
@@ -35,6 +50,7 @@ async def list_creators(
 @router.post("", response_model=CreatorResponse, status_code=status.HTTP_201_CREATED)
 async def create_creator(
     payload: CreatorCreate,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Creator:
@@ -71,6 +87,8 @@ async def create_creator(
     db.add(creator)
     await db.commit()
     await db.refresh(creator)
+
+    background_tasks.add_task(_run_initial_crawl, creator.id)
     return creator
 
 
@@ -120,25 +138,3 @@ async def delete_creator(
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-
-@router.post("/{creator_id}/crawl", response_model=CrawlAcceptedResponse)
-async def trigger_creator_crawl(
-    creator_id: str,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> CrawlAcceptedResponse:
-    creator = await db.scalar(
-        select(Creator).where(
-            Creator.id == creator_id,
-            Creator.user_id == current_user.id,
-        )
-    )
-    if creator is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Creator not found")
-
-    try:
-        videos_found = await crawl_creator(creator)
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
-
-    return CrawlAcceptedResponse(status=CrawlLogStatus.SUCCESS, videos_found=videos_found)

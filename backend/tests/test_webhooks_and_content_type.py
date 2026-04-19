@@ -4,6 +4,7 @@ Tests for:
   - /api/creators  content_type filter & default
   - FeishuNotifier.send_card
 """
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -12,6 +13,7 @@ import httpx
 from app.models.models import ContentType, Platform
 from app.services.crawlers.base import CreatorInfo
 from app.services.notifiers.feishu import FeishuNotifier
+from app.services.notifiers.feishu_client import FeishuAppClient
 
 REGISTER_PAYLOAD = {
     "email": "alice@example.com",
@@ -383,3 +385,216 @@ class TestFeishuNotifier:
         title_element = next((e for e in elements if e.get("tag") == "div" and "text" in e), None)
         assert title_element is not None
         assert video_url in title_element["text"]["content"]
+
+    async def test_send_card_without_app_falls_back_to_text_link(self):
+        """未配置自建应用时，封面以文本链接形式嵌入。"""
+        notifier = FeishuNotifier(app_client=FeishuAppClient(app_id="", app_secret=""))
+        sent_payload = {}
+
+        with patch("app.services.notifiers.feishu.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client_cls.return_value = mock_client
+
+            await notifier.send_card(
+                webhook_url=WEBHOOK_URL,
+                title="港股分析",
+                creator_name="财经UP",
+                platform="bilibili",
+                video_url="https://www.bilibili.com/video/BV1",
+                thumbnail_url="https://i0.hdslb.com/cover.jpg",
+            )
+
+        elements = sent_payload.get("card", {}).get("elements", [])
+        assert not any(e.get("tag") == "img" for e in elements)
+        title_element = next((e for e in elements if e.get("tag") == "div" and "text" in e), None)
+        assert "封面预览" in title_element["text"]["content"]
+
+    async def test_send_card_uploads_cover_when_app_configured(self):
+        """配置了自建应用时，上传封面并以 img 元素嵌入卡片。"""
+        app_client = FeishuAppClient(app_id="cli_test", app_secret="secret")
+        notifier = FeishuNotifier(app_client=app_client)
+        sent_payload = {}
+
+        async def fake_upload(url):
+            assert url == "https://i0.hdslb.com/cover.jpg"
+            return "img_v3_0001"
+
+        with (
+            patch.object(app_client, "upload_image_from_url", new=AsyncMock(side_effect=fake_upload)),
+            patch("app.services.notifiers.feishu.httpx.AsyncClient") as mock_client_cls,
+        ):
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client_cls.return_value = mock_client
+
+            await notifier.send_card(
+                webhook_url=WEBHOOK_URL,
+                title="港股分析",
+                creator_name="财经UP",
+                platform="bilibili",
+                video_url="https://www.bilibili.com/video/BV1",
+                thumbnail_url="https://i0.hdslb.com/cover.jpg",
+            )
+
+        elements = sent_payload.get("card", {}).get("elements", [])
+        img_element = next((e for e in elements if e.get("tag") == "img"), None)
+        assert img_element is not None
+        assert img_element["img_key"] == "img_v3_0001"
+        assert img_element["mode"] == "crop_center"
+        # 使用 img 元素后不应再出现封面预览文案
+        title_element = next((e for e in elements if e.get("tag") == "div" and "text" in e), None)
+        assert "封面预览" not in title_element["text"]["content"]
+
+    async def test_send_card_uses_compact_card_layout_for_cover(self):
+        notifier = FeishuNotifier()
+        sent_payload = {}
+
+        with patch("app.services.notifiers.feishu.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client_cls.return_value = mock_client
+
+            await notifier.send_card(
+                webhook_url=WEBHOOK_URL,
+                title="港股分析",
+                creator_name="财经UP",
+                platform="bilibili",
+                video_url="https://www.bilibili.com/video/BV1",
+            )
+
+        card = sent_payload.get("card", {})
+        assert card.get("config", {}).get("wide_screen_mode") is False
+
+    async def test_send_card_includes_published_at_second_precision(self):
+        """published_at 有分秒信息 → 卡片 fields 含 yyyy-MM-dd HH:mm:ss。"""
+        notifier = FeishuNotifier(app_client=FeishuAppClient(app_id="", app_secret=""))
+        sent_payload = {}
+
+        with patch("app.services.notifiers.feishu.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client_cls.return_value = mock_client
+
+            await notifier.send_card(
+                webhook_url=WEBHOOK_URL,
+                title="港股分析",
+                creator_name="财经UP",
+                platform="bilibili",
+                video_url="https://www.bilibili.com/video/BV1",
+                published_at=datetime(2026, 4, 19, 15, 30, 42, tzinfo=UTC),
+            )
+
+        elements = sent_payload.get("card", {}).get("elements", [])
+        texts = [
+            f["text"]["content"]
+            for el in elements
+            if el.get("tag") == "div" and "fields" in el
+            for f in el["fields"]
+        ]
+        joined = "\n".join(texts)
+        assert "2026-04-19 15:30:42" in joined
+        assert "发布时间" in joined
+
+    async def test_send_card_published_at_hour_precision_fallback(self):
+        """分秒都为 0 → 降级为小时级 yyyy-MM-dd HH:00:00。"""
+        notifier = FeishuNotifier(app_client=FeishuAppClient(app_id="", app_secret=""))
+        sent_payload = {}
+
+        with patch("app.services.notifiers.feishu.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client_cls.return_value = mock_client
+
+            await notifier.send_card(
+                webhook_url=WEBHOOK_URL,
+                title="港股分析",
+                creator_name="财经UP",
+                platform="bilibili",
+                video_url="https://www.bilibili.com/video/BV1",
+                published_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
+            )
+
+        elements = sent_payload.get("card", {}).get("elements", [])
+        texts = [
+            f["text"]["content"]
+            for el in elements
+            if el.get("tag") == "div" and "fields" in el
+            for f in el["fields"]
+        ]
+        joined = "\n".join(texts)
+        assert "2024-01-01 10:00:00" in joined
+
+    async def test_send_card_without_published_at_omits_field(self):
+        """published_at=None → fields 中不含 '发布时间'。"""
+        notifier = FeishuNotifier(app_client=FeishuAppClient(app_id="", app_secret=""))
+        sent_payload = {}
+
+        with patch("app.services.notifiers.feishu.httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client_cls.return_value = mock_client
+
+            await notifier.send_card(
+                webhook_url=WEBHOOK_URL,
+                title="港股分析",
+                creator_name="财经UP",
+                platform="bilibili",
+                video_url="https://www.bilibili.com/video/BV1",
+            )
+
+        elements = sent_payload.get("card", {}).get("elements", [])
+        texts = [
+            f["text"]["content"]
+            for el in elements
+            if el.get("tag") == "div" and "fields" in el
+            for f in el["fields"]
+        ]
+        joined = "\n".join(texts)
+        assert "发布时间" not in joined
+
+    async def test_send_card_upload_failure_falls_back_to_text_link(self):
+        """上传失败时优雅回退到文本链接。"""
+        app_client = FeishuAppClient(app_id="cli_test", app_secret="secret")
+        notifier = FeishuNotifier(app_client=app_client)
+        sent_payload = {}
+
+        with (
+            patch.object(
+                app_client,
+                "upload_image_from_url",
+                new=AsyncMock(side_effect=RuntimeError("boom")),
+            ),
+            patch("app.services.notifiers.feishu.httpx.AsyncClient") as mock_client_cls,
+        ):
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client_cls.return_value = mock_client
+
+            await notifier.send_card(
+                webhook_url=WEBHOOK_URL,
+                title="港股分析",
+                creator_name="财经UP",
+                platform="bilibili",
+                video_url="https://www.bilibili.com/video/BV1",
+                thumbnail_url="https://i0.hdslb.com/cover.jpg",
+            )
+
+        elements = sent_payload.get("card", {}).get("elements", [])
+        assert not any(e.get("tag") == "img" for e in elements)
+        title_element = next((e for e in elements if e.get("tag") == "div" and "text" in e), None)
+        assert "封面预览" in title_element["text"]["content"]
